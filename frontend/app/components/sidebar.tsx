@@ -7,7 +7,7 @@ import { logout } from "../services/auth";
 
 type NavItem = { label: string; href: string; icon: string };
 
-function readRole(): "admin" | "gerente" | "seller" | "" {
+function readRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
   if (typeof window === "undefined") return "";
   const raw =
     localStorage.getItem("role") ||
@@ -15,15 +15,18 @@ function readRole(): "admin" | "gerente" | "seller" | "" {
     localStorage.getItem("perfil") ||
     "";
   const role = raw.trim().toLowerCase();
+
   if (role === "admin") return "admin";
-  if (role === "gerente") return "gerente";
+  if (role === "gerente" || role === "manager") return "gerente";
   if (role === "seller") return "seller";
+  if (role === "vendedora") return "vendedora";
   return "";
 }
 
 const navAll: NavItem[] = [
   { label: "Estoque", href: "/estoque", icon: "📦" },
   { label: "Vendas", href: "/vendas", icon: "💰" },
+  { label: "Malas", href: "/malas", icon: "🧳" },
   { label: "Vendedoras", href: "/vendedoras", icon: "🧍‍♀️" },
   { label: "Relatórios", href: "/relatorios", icon: "📊" },
 ];
@@ -32,30 +35,29 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [role, setRole] = useState<"admin" | "gerente" | "seller" | "">("");
+  const [role, setRole] = useState<"admin" | "gerente" | "seller" | "vendedora" | "">("");
 
-  // ✅ inicializa e mantém atualizado
   useEffect(() => {
     setRole(readRole());
 
-    // atualiza se alguém mexer no localStorage (em outra aba)
     const onStorage = () => setRole(readRole());
     window.addEventListener("storage", onStorage);
 
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // ✅ garante atualização ao navegar
   useEffect(() => {
     setRole(readRole());
   }, [pathname]);
 
-  // ✅ seller não entra em rotas proibidas nem digitando URL
   useEffect(() => {
-    if (role === "seller") {
+    const isSeller = role === "seller" || role === "vendedora";
+
+    if (isSeller) {
       if (
         pathname.startsWith("/relatorios") ||
-        pathname.startsWith("/vendedoras")
+        pathname.startsWith("/vendedoras") ||
+        pathname.startsWith("/malas")
       ) {
         router.replace("/vendas");
       }
@@ -63,11 +65,12 @@ export function Sidebar() {
   }, [role, pathname, router]);
 
   const nav = useMemo(() => {
-    if (role === "seller") {
-      return navAll.filter(
-        (i) => i.href === "/estoque" || i.href === "/vendas"
-      );
+    const isSeller = role === "seller" || role === "vendedora";
+
+    if (isSeller) {
+      return navAll.filter((i) => i.href === "/estoque" || i.href === "/vendas");
     }
+
     return navAll;
   }, [role]);
 

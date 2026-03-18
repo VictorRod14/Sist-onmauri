@@ -7,6 +7,9 @@ export interface Product {
   price: number;
   stock: number;
   active: boolean;
+  cost_price?: number | null;
+  resale_price?: number | null;
+  profit?: number | null;
 }
 
 export async function getProducts(): Promise<Product[]> {
@@ -19,6 +22,8 @@ export type ProductPayload = {
   description?: string | null;
   price: number;
   stock: number;
+  cost_price?: number | null;
+  resale_price?: number | null;
 };
 
 export async function createProduct(payload: ProductPayload) {

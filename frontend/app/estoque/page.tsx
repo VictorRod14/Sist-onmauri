@@ -5,25 +5,39 @@ import { deleteProduct, getProducts, Product } from "../services/products";
 import Modal from "../components/modal";
 import { ConfirmModal } from "../components/confirmmodal";
 import { ProductForm } from "../components/productform";
-import { ProductCard } from "../components/productcard";
+import ProductCard from "../components/productcard";
 import { DashboardShell } from "../components/dashboardshell";
 
 type SortKey = "name" | "price" | "stock";
 
+function getRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
+  if (typeof window === "undefined") return "";
+  const raw =
+    localStorage.getItem("role") ||
+    localStorage.getItem("user_role") ||
+    localStorage.getItem("perfil") ||
+    "";
+  const role = raw.trim().toLowerCase();
+
+  if (role === "admin") return "admin";
+  if (role === "gerente" || role === "manager") return "gerente";
+  if (role === "seller") return "seller";
+  if (role === "vendedora") return "vendedora";
+  return "";
+}
+
 export default function EstoquePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [role, setRole] = useState<"admin" | "gerente" | "seller" | "vendedora" | "">("");
 
-  // modais
   const [openCreate, setOpenCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
 
-  // delete (modal confirmação)
   const [openDelete, setOpenDelete] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // filtros
   const [query, setQuery] = useState("");
   const [onlyLowStock, setOnlyLowStock] = useState(false);
   const [onlyOutOfStock, setOnlyOutOfStock] = useState(false);
@@ -36,7 +50,12 @@ export default function EstoquePage() {
 
   useEffect(() => {
     loadProducts();
+    setRole(getRole());
   }, []);
+
+  const canViewFinancial = useMemo(() => {
+    return role === "admin" || role === "gerente";
+  }, [role]);
 
   const stats = useMemo(() => {
     const total = products.length;
@@ -92,7 +111,6 @@ export default function EstoquePage() {
     try {
       await deleteProduct(deleteId);
       await loadProducts();
-
       setOpenDelete(false);
       setDeleteId(null);
     } catch {
@@ -116,7 +134,6 @@ export default function EstoquePage() {
       }
     >
       <main className="p-6 space-y-6">
-        {/* ferramentas */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md">
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="lg:col-span-1">
@@ -161,7 +178,7 @@ export default function EstoquePage() {
               <label className="text-xs font-semibold text-gray-600">Ordenar por</label>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
                 className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
               >
                 <option value="name">Nome (A–Z)</option>
@@ -172,7 +189,12 @@ export default function EstoquePage() {
           </div>
         </div>
 
-        {/* modal criar */}
+        {canViewFinancial && (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            Você está vendo informações financeiras sensíveis dos produtos.
+          </div>
+        )}
+
         <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="Cadastrar produto">
           <ProductForm
             onCreated={() => {
@@ -182,7 +204,6 @@ export default function EstoquePage() {
           />
         </Modal>
 
-        {/* modal editar */}
         <Modal
           open={openEdit}
           onClose={() => {
@@ -201,7 +222,6 @@ export default function EstoquePage() {
           />
         </Modal>
 
-        {/* modal confirmação delete */}
         <ConfirmModal
           open={openDelete}
           title="Excluir produto"
@@ -215,7 +235,6 @@ export default function EstoquePage() {
           onConfirm={confirmDelete}
         />
 
-        {/* lista */}
         {filtered.length === 0 ? (
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md text-gray-600">
             Nenhum produto encontrado com esses filtros.
@@ -228,6 +247,7 @@ export default function EstoquePage() {
                 product={p}
                 onEdit={handleEdit}
                 onDelete={handleDeleteRequest}
+                canViewFinancial={canViewFinancial}
               />
             ))}
           </div>
