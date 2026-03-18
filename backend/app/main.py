@@ -7,7 +7,7 @@ from routes.seller import router as seller_router
 from routes.report import router as report_router
 from routes.notifications import router as notifications_router
 from routes.auth import router as auth_router
-
+from routes.bag import router as bag_router
 
 
 app = FastAPI(
@@ -16,13 +16,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# 🔥 CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-         "https://sistema-onmauri-1.onrender.com",
+        "https://sist-onmauri-1.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -36,13 +35,16 @@ def on_startup():
 app.include_router(product_router, prefix="/products", tags=["Products"])
 app.include_router(order_router, prefix="/orders", tags=["Orders"])
 app.include_router(seller_router, prefix="/sellers")
+app.include_router(bag_router, prefix="/bags", tags=["Bags"])
+
+@app.get("/")
+def root():
+    return {"message": "API Sistema OnMauri online"}
 
 @app.get("/health")
 def health():
     return {"status": "ok", "system": "OnMauri"}
 
 app.include_router(report_router, prefix="/reports", tags=["Reports"])
-
 app.include_router(notifications_router)
-
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
