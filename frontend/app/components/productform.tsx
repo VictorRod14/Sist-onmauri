@@ -21,14 +21,35 @@ function formatBRL(value: number) {
   });
 }
 
+function sanitizeMoneyInput(value: string) {
+  const cleaned = value.replace(",", ".").replace(/[^\d.]/g, "");
+
+  const parts = cleaned.split(".");
+  if (parts.length <= 2) return cleaned;
+
+  return `${parts[0]}.${parts.slice(1).join("")}`;
+}
+
+function normalizeMoneyForSubmit(value: string) {
+  const sanitized = sanitizeMoneyInput(value).replace(/^0+(?=\d)/, "");
+  const parsed = Number(sanitized || "0");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeIntegerForSubmit(value: string) {
+  const cleaned = value.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "");
+  const parsed = Number(cleaned || "0");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
   const isEdit = !!initialProduct;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState<number>(0);
-  const [stock, setStock] = useState<number>(0);
-  const [costPrice, setCostPrice] = useState<number>(0);
+  const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("");
+  const [costPrice, setCostPrice] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,23 +59,40 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
     if (initialProduct) {
       setName(initialProduct.name ?? "");
       setDescription(initialProduct.description ?? "");
-      setPrice(initialProduct.price ?? 0);
-      setStock(initialProduct.stock ?? 0);
-      setCostPrice(initialProduct.cost_price ?? 0);
+      setPrice(
+        initialProduct.price !== undefined && initialProduct.price !== null
+          ? String(initialProduct.price)
+          : ""
+      );
+      setStock(
+        initialProduct.stock !== undefined && initialProduct.stock !== null
+          ? String(initialProduct.stock)
+          : ""
+      );
+      setCostPrice(
+        initialProduct.cost_price !== undefined && initialProduct.cost_price !== null
+          ? String(initialProduct.cost_price)
+          : ""
+      );
     } else {
       setName("");
       setDescription("");
-      setPrice(0);
-      setStock(0);
-      setCostPrice(0);
+      setPrice("");
+      setStock("");
+      setCostPrice("");
     }
+
     setError(null);
     setSuccess(null);
   }, [initialProduct]);
 
+  const priceNumber = useMemo(() => normalizeMoneyForSubmit(price), [price]);
+  const costPriceNumber = useMemo(() => normalizeMoneyForSubmit(costPrice), [costPrice]);
+  const stockNumber = useMemo(() => normalizeIntegerForSubmit(stock), [stock]);
+
   const profitPreview = useMemo(() => {
-    return price - costPrice;
-  }, [price, costPrice]);
+    return priceNumber - costPriceNumber;
+  }, [priceNumber, costPriceNumber]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,16 +100,20 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
     setSuccess(null);
 
     if (!name.trim()) return setError("Nome é obrigatório.");
-    if (price < 0) return setError("Preço de venda não pode ser negativo.");
-    if (stock < 0) return setError("Estoque não pode ser negativo.");
-    if (costPrice < 0) return setError("Custo não pode ser negativo.");
+    if (!price.trim()) return setError("Preço de venda é obrigatório.");
+    if (!stock.trim()) return setError("Estoque é obrigatório.");
+    if (!costPrice.trim()) return setError("Custo é obrigatório.");
+
+    if (priceNumber < 0) return setError("Preço de venda não pode ser negativo.");
+    if (stockNumber < 0) return setError("Estoque não pode ser negativo.");
+    if (costPriceNumber < 0) return setError("Custo não pode ser negativo.");
 
     const payload: ProductPayload = {
       name: name.trim(),
       description: description.trim() || null,
-      price,
-      stock,
-      cost_price: costPrice,
+      price: priceNumber,
+      stock: stockNumber,
+      cost_price: costPriceNumber,
     };
 
     setLoading(true);
@@ -85,13 +127,21 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
         setSuccess("Produto cadastrado com sucesso!");
         setName("");
         setDescription("");
-        setPrice(0);
-        setStock(0);
-        setCostPrice(0);
+        setPrice("");
+        setStock("");
+        setCostPrice("");
         onCreated?.();
       }
-    } catch {
-      setError("Falha ao salvar. Verifique o backend e tente novamente.");
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+
+      if (typeof detail === "string") {
+        setError(detail);
+      } else if (Array.isArray(detail)) {
+        setError(detail.map((item: any) => item?.msg || JSON.stringify(item)).join(" | "));
+      } else {
+        setError("Falha ao salvar. Verifique o backend e tente novamente.");
+      }
     } finally {
       setLoading(false);
     }
@@ -142,21 +192,24 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
         <div>
           <label className="text-sm text-gray-600">Preço de venda</label>
           <input
-            type="number"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
             value={price}
-            onChange={(e) => setPrice(Number(e.target.value))}
+            onChange={(e) => setPrice(sanitizeMoneyInput(e.target.value))}
+            placeholder="Ex: 99,90"
           />
         </div>
 
         <div>
           <label className="text-sm text-gray-600">Estoque</label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
             value={stock}
-            onChange={(e) => setStock(Number(e.target.value))}
+            onChange={(e) => setStock(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder="Ex: 10"
           />
         </div>
       </div>
@@ -164,11 +217,12 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
       <div>
         <label className="text-sm text-gray-600">Custo</label>
         <input
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
           value={costPrice}
-          onChange={(e) => setCostPrice(Number(e.target.value))}
+          onChange={(e) => setCostPrice(sanitizeMoneyInput(e.target.value))}
+          placeholder="Ex: 45,00"
         />
       </div>
 
@@ -188,7 +242,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
         className="w-full bg-black text-white px-4 py-3 rounded-lg hover:opacity-90 disabled:opacity-50"
         type="submit"
       >
-        {isEdit ? "Salvar Alterações" : "Cadastrar Produto"}
+        {isEdit ? "Salvar TESTE 123" : "Cadastrar TESTE 123"}
       </button>
     </form>
   );
