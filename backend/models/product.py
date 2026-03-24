@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean
 from db.database import Base
 
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -10,3 +11,5 @@ class Product(Base):
     price = Column(Float, nullable=False)
     stock = Column(Integer, default=0)
     active = Column(Boolean, default=True)
+
+    cost_price = Column(Float, nullable=True)
