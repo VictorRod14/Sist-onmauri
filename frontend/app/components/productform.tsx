@@ -242,7 +242,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
         className="w-full bg-black text-white px-4 py-3 rounded-lg hover:opacity-90 disabled:opacity-50"
         type="submit"
       >
-        {isEdit ? "Salvar TESTE 123" : "Cadastrar TESTE 123"}
+        {isEdit ? "Salvar Produto" : "Cadastrar Produto"}
       </button>
     </form>
   );
