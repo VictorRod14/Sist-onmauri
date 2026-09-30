@@ -26,6 +26,7 @@ function readRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
 const navAll: NavItem[] = [
   { label: "Estoque", href: "/estoque", icon: "📦" },
   { label: "Vendas", href: "/vendas", icon: "💰" },
+  { label: "Minhas vendas", href: "/minhas-vendas", icon: "📈" },
   { label: "Malas", href: "/malas", icon: "🧳" },
   { label: "Vendedoras", href: "/vendedoras", icon: "🧍‍♀️" },
   { label: "Relatórios", href: "/relatorios", icon: "📊" },
@@ -56,8 +57,7 @@ export function Sidebar() {
     if (isSeller) {
       if (
         pathname.startsWith("/relatorios") ||
-        pathname.startsWith("/vendedoras") ||
-        pathname.startsWith("/malas")
+        pathname.startsWith("/vendedoras")
       ) {
         router.replace("/vendas");
       }
@@ -68,10 +68,12 @@ export function Sidebar() {
     const isSeller = role === "seller" || role === "vendedora";
 
     if (isSeller) {
-      return navAll.filter((i) => i.href === "/estoque" || i.href === "/vendas");
+      return navAll.filter((i) =>
+        ["/estoque", "/vendas", "/minhas-vendas", "/malas"].includes(i.href)
+      );
     }
 
-    return navAll;
+    return navAll.filter((i) => i.href !== "/minhas-vendas");
   }, [role]);
 
   async function handleLogout() {
@@ -80,13 +82,13 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-72 shrink-0 border-r border-gray-200 bg-white p-4 flex flex-col">
+    <aside className="flex w-full shrink-0 flex-col rounded-3xl border border-gray-200 bg-white p-4 shadow-sm lg:w-72 lg:rounded-none lg:border-y-0 lg:border-l-0 lg:shadow-none">
       <div className="mb-6">
         <div className="text-xl font-extrabold">OnMauri</div>
         <div className="text-xs text-gray-500">Sistema • Loja de roupas</div>
       </div>
 
-      <nav className="space-y-2 flex-1">
+      <nav className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:block lg:space-y-2">
         {nav.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");

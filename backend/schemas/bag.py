@@ -43,6 +43,7 @@ class BagItemResponse(BaseModel):
 
 class BagResponse(BaseModel):
     id: int
+    created_by_user_id: int | None = None
     customer_name: str
     customer_phone: str | None = None
     status: str

@@ -5,6 +5,7 @@ import { DashboardShell } from "../components/dashboardshell";
 import Modal from "../components/modal";
 import { getProducts, Product } from "../services/products";
 import { createBag, getBags, returnBag, Bag } from "../services/bag";
+import { ProductAutocomplete } from "../components/productautocomplete";
 
 type PaymentMethod = "pix" | "credito" | "debito" | "dinheiro";
 
@@ -184,7 +185,10 @@ export default function MalasPage() {
     setError(null);
     setSelectedBag(bag);
     setReturnPayment("pix");
-    setReturnSeller("");
+    const currentRole = getRole();
+    setReturnSeller(
+      currentRole === "seller" || currentRole === "vendedora" ? getUserName() : ""
+    );
     setReturnNote("");
     setReturnItems(
       bag.items.map((item) => ({
@@ -260,25 +264,12 @@ export default function MalasPage() {
     }
   }
 
-  if (role === "seller" || role === "vendedora") {
-    return (
-      <DashboardShell
-        title="Malas"
-        subtitle="Área restrita"
-      >
-        <main className="p-6">
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
-            Você não tem permissão para acessar essa área.
-          </div>
-        </main>
-      </DashboardShell>
-    );
-  }
+  const isSeller = role === "seller" || role === "vendedora";
 
   return (
     <DashboardShell
       title="Malas"
-      subtitle={subtitle}
+      subtitle={isSeller ? `Suas malas • ${subtitle}` : subtitle}
       right={
         <button
           onClick={openCreateModal}
@@ -412,33 +403,26 @@ export default function MalasPage() {
             </div>
 
             <div className="rounded-2xl border border-gray-200 p-4 space-y-3">
-              <div className="grid gap-3 sm:grid-cols-[1fr_120px_auto]">
-                <select
-                  value={selectedProductId}
-                  onChange={(e) =>
-                    setSelectedProductId(e.target.value ? Number(e.target.value) : "")
-                  }
-                  className="rounded-xl border border-gray-200 px-3 py-2"
-                >
-                  <option value="">Selecione um produto…</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — Estoque: {p.stock}
-                    </option>
-                  ))}
-                </select>
+              <ProductAutocomplete
+                products={products}
+                selectedId={selectedProductId}
+                onSelect={setSelectedProductId}
+                label="Produto"
+                placeholder="Digite o código ou nome do produto"
+              />
 
+              <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
                 <input
                   type="number"
                   min={1}
                   value={selectedQty}
                   onChange={(e) => setSelectedQty(Number(e.target.value))}
-                  className="rounded-xl border border-gray-200 px-3 py-2"
+                  className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2"
                 />
 
                 <button
                   onClick={addDraftItem}
-                  className="rounded-xl bg-black px-4 py-2 text-white"
+                  className="w-full rounded-xl bg-black px-4 py-2 text-white"
                 >
                   Adicionar
                 </button>
@@ -527,6 +511,7 @@ export default function MalasPage() {
                     onChange={(e) => setReturnSeller(e.target.value)}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2"
                     placeholder="Nome da vendedora"
+                    disabled={isSeller}
                   />
                 </div>
 
@@ -625,4 +610,9 @@ export default function MalasPage() {
       </main>
     </DashboardShell>
   );
+}
+
+function getUserName() {
+  if (typeof window === "undefined") return "";
+  return (localStorage.getItem("user_name") || localStorage.getItem("name") || "").trim();
 }

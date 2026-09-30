@@ -45,7 +45,7 @@ export default function LoginPage() {
       }
 
       // redirecionamento por perfil
-      if (data.role === "seller") {
+      if (data.role === "seller" || data.role === "vendedora") {
         router.push("/vendas");
         return;
       }

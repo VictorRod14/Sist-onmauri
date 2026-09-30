@@ -12,7 +12,14 @@ type Props = {
   onCreated?: () => void;
   onUpdated?: () => void;
   initialProduct?: Product | null;
+  nextCode?: string;
 };
+
+function splitProductName(value: string) {
+  const match = value.trim().match(/^(\d{1,})\s+(.+)$/);
+  if (!match) return { code: "", name: value.trim() };
+  return { code: match[1].padStart(5, "0"), name: match[2].trim() };
+}
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", {
@@ -42,10 +49,11 @@ function normalizeIntegerForSubmit(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
+export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "00001" }: Props) {
   const isEdit = !!initialProduct;
 
   const [name, setName] = useState("");
+  const [code, setCode] = useState(nextCode);
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
@@ -57,7 +65,9 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
 
   useEffect(() => {
     if (initialProduct) {
-      setName(initialProduct.name ?? "");
+      const parsed = splitProductName(initialProduct.name ?? "");
+      setCode(parsed.code || String(initialProduct.id).padStart(5, "0"));
+      setName(parsed.name);
       setDescription(initialProduct.description ?? "");
       setPrice(
         initialProduct.price !== undefined && initialProduct.price !== null
@@ -75,6 +85,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
           : ""
       );
     } else {
+      setCode(nextCode);
       setName("");
       setDescription("");
       setPrice("");
@@ -84,7 +95,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
 
     setError(null);
     setSuccess(null);
-  }, [initialProduct]);
+  }, [initialProduct, nextCode]);
 
   const priceNumber = useMemo(() => normalizeMoneyForSubmit(price), [price]);
   const costPriceNumber = useMemo(() => normalizeMoneyForSubmit(costPrice), [costPrice]);
@@ -100,6 +111,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
     setSuccess(null);
 
     if (!name.trim()) return setError("Nome é obrigatório.");
+    if (!code.trim()) return setError("Código é obrigatório.");
     if (!price.trim()) return setError("Preço de venda é obrigatório.");
     if (!stock.trim()) return setError("Estoque é obrigatório.");
     if (!costPrice.trim()) return setError("Custo é obrigatório.");
@@ -109,7 +121,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
     if (costPriceNumber < 0) return setError("Custo não pode ser negativo.");
 
     const payload: ProductPayload = {
-      name: name.trim(),
+      name: `${code.replace(/\D/g, "").padStart(5, "0")} ${name.trim()}`,
       description: description.trim() || null,
       price: priceNumber,
       stock: stockNumber,
@@ -126,6 +138,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
         await createProduct(payload);
         setSuccess("Produto cadastrado com sucesso!");
         setName("");
+        setCode(String(Number(code) + 1).padStart(5, "0"));
         setDescription("");
         setPrice("");
         setStock("");
@@ -168,14 +181,28 @@ export function ProductForm({ onCreated, onUpdated, initialProduct }: Props) {
         </div>
       )}
 
-      <div>
-        <label className="text-sm text-gray-600">Nome</label>
-        <input
-          className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Ex: Camisa OnMauri"
-        />
+      <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+        <div>
+          <label className="text-sm font-medium text-gray-700">Código</label>
+          <input
+            inputMode="numeric"
+            maxLength={8}
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 font-mono font-bold tracking-wider focus:outline-none focus:ring"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/[^\d]/g, ""))}
+            placeholder="00001"
+          />
+          {!isEdit && <p className="mt-1 text-xs text-gray-500">Próximo código sugerido</p>}
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-700">Nome do produto</label>
+          <input
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex: Vestido Guipir Nude"
+          />
+        </div>
       </div>
 
       <div>

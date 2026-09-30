@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect, text
 
 from db.database import engine, Base, SessionLocal
 
@@ -57,4 +58,25 @@ def seed_users():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _ensure_compatible_columns()
     seed_users()
+
+
+def _ensure_compatible_columns():
+    """Migrações pequenas e seguras para instalações SQLite já existentes."""
+    inspector = inspect(engine)
+
+    if "orders" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("orders")}
+        with engine.begin() as connection:
+            if "customer_name" not in columns:
+                connection.execute(text("ALTER TABLE orders ADD COLUMN customer_name VARCHAR"))
+            if "created_by_user_id" not in columns:
+                connection.execute(text("ALTER TABLE orders ADD COLUMN created_by_user_id INTEGER"))
+
+    inspector = inspect(engine)
+    if "bags" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("bags")}
+        if "created_by_user_id" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE bags ADD COLUMN created_by_user_id INTEGER"))

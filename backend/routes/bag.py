@@ -38,6 +38,7 @@ def _build_bag_response(db: Session, bag: Bag) -> dict:
 
     return {
         "id": bag.id,
+        "created_by_user_id": bag.created_by_user_id,
         "customer_name": bag.customer_name,
         "customer_phone": bag.customer_phone,
         "status": bag.status,
@@ -55,9 +56,12 @@ def _build_bag_response(db: Session, bag: Bag) -> dict:
 @router.get("/", response_model=list[BagResponse])
 def list_bags(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "gerente", "manager")),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager", "seller", "vendedora")),
 ):
-    bags = db.query(Bag).order_by(Bag.id.desc()).all()
+    query = db.query(Bag)
+    if current_user.role in ("seller", "vendedora"):
+        query = query.filter(Bag.created_by_user_id == current_user.id)
+    bags = query.order_by(Bag.id.desc()).all()
     return [_build_bag_response(db, bag) for bag in bags]
 
 
@@ -65,12 +69,15 @@ def list_bags(
 def get_bag(
     bag_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "gerente", "manager")),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager", "seller", "vendedora")),
 ):
     bag = db.query(Bag).filter(Bag.id == bag_id).first()
 
     if not bag:
         raise HTTPException(status_code=404, detail="Mala não encontrada")
+
+    if current_user.role in ("seller", "vendedora") and bag.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você só pode acessar suas próprias malas")
 
     return _build_bag_response(db, bag)
 
@@ -79,7 +86,7 @@ def get_bag(
 def create_bag(
     payload: BagCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "gerente", "manager")),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager", "seller", "vendedora")),
 ):
     customer_name = (payload.customer_name or "").strip()
 
@@ -158,12 +165,15 @@ def return_bag(
     bag_id: int,
     payload: BagReturn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "gerente", "manager")),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager", "seller", "vendedora")),
 ):
     bag = db.query(Bag).filter(Bag.id == bag_id).first()
 
     if not bag:
         raise HTTPException(status_code=404, detail="Mala não encontrada")
+
+    if current_user.role in ("seller", "vendedora") and bag.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você só pode finalizar suas próprias malas")
 
     if bag.status != "open":
         raise HTTPException(status_code=400, detail="Essa mala já foi finalizada")
@@ -243,9 +253,14 @@ def return_bag(
         if payload.note and payload.note.strip():
             order_note = f"{order_note} - {payload.note.strip()}"
 
+        is_seller = current_user.role in ("seller", "vendedora")
+        seller_name = current_user.name if is_seller else (payload.seller.strip() if payload.seller else None)
+
         created_order = Order(
             total=total_sold_amount,
-            seller=(payload.seller.strip() if payload.seller else None),
+            seller=seller_name,
+            customer_name=bag.customer_name,
+            created_by_user_id=current_user.id,
             payment=payload.payment,
             discount_type="none",
             discount_value=0.0,
@@ -267,11 +282,11 @@ def return_bag(
 
         bag.order_id = created_order.id
         bag.payment = payload.payment
-        bag.seller = payload.seller.strip() if payload.seller else None
+        bag.seller = seller_name
     else:
         bag.order_id = None
         bag.payment = None
-        bag.seller = payload.seller.strip() if payload.seller else None
+        bag.seller = current_user.name if current_user.role in ("seller", "vendedora") else (payload.seller.strip() if payload.seller else None)
 
     if payload.note and payload.note.strip():
         if bag.note and bag.note.strip():

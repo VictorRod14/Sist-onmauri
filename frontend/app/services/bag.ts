@@ -12,6 +12,7 @@ export interface BagItem {
 
 export interface Bag {
   id: number;
+  created_by_user_id?: number | null;
   customer_name: string;
   customer_phone?: string | null;
   status: string;

@@ -13,10 +13,10 @@ type Props = {
 export function DashboardShell({ title, subtitle, right, children }: Props) {
   return (
     <div className="min-h-screen bg-[#f6f7f9]">
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-4 lg:flex-row lg:py-6">
         <Sidebar />
 
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           {/* Topbar */}
           <div className="sticky top-0 z-40 -mx-4 mb-6 px-4 pt-2">
             <div className="rounded-3xl border border-gray-200 bg-white/80 backdrop-blur shadow-md">

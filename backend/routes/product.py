@@ -8,6 +8,16 @@ from schemas.product import ProductCreate, ProductResponse
 router = APIRouter(tags=["Products"])
 
 
+@router.get("/next-code")
+def get_next_product_code(db: Session = Depends(get_db)):
+    highest = 0
+    for (name,) in db.query(Product.name).all():
+        first_part = (name or "").strip().split(" ", 1)[0]
+        if first_part.isdigit():
+            highest = max(highest, int(first_part))
+    return {"next_code": str(highest + 1).zfill(5)}
+
+
 def build_product_response(product: Product) -> dict:
     profit = None
     if product.cost_price is not None:

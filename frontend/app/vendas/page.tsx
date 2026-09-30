@@ -7,6 +7,7 @@ import { getProducts, Product } from "../services/products";
 import { SaleSuccessModal } from "../components/salesuccessmodal";
 import { createOrder } from "../services/order";
 import { getSellers, Seller } from "../services/sellers";
+import { ProductAutocomplete } from "../components/productautocomplete";
 
 type PaymentMethod = "pix" | "credito" | "debito" | "dinheiro";
 
@@ -20,7 +21,7 @@ function formatBRL(value: number) {
 }
 
 // ✅ Lê role de forma robusta (evita "seller ", "Seller", etc.)
-function getRole(): "admin" | "gerente" | "seller" | "" {
+function getRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
   if (typeof window === "undefined") return "";
   const raw =
     localStorage.getItem("role") ||
@@ -32,6 +33,7 @@ function getRole(): "admin" | "gerente" | "seller" | "" {
   if (role === "admin") return "admin";
   if (role === "gerente") return "gerente";
   if (role === "seller") return "seller";
+  if (role === "vendedora") return "vendedora";
   return "";
 }
 
@@ -65,6 +67,7 @@ export default function VendasPage() {
 
   // venda
   const [seller, setSeller] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [payment, setPayment] = useState<PaymentMethod>("pix");
   const [discountType, setDiscountType] = useState<"none" | "money" | "percent">(
     "none"
@@ -126,7 +129,7 @@ export default function VendasPage() {
 
     // ✅ se for seller, tenta setar automaticamente a vendedora
     const role = getRole();
-    if (role === "seller") {
+    if (role === "seller" || role === "vendedora") {
       const name = getUserName();
       if (name) setSeller(name);
     }
@@ -251,13 +254,14 @@ export default function VendasPage() {
     setCart([]);
     // se for seller, mantém o próprio nome
     const role = getRole();
-    if (role === "seller") {
+    if (role === "seller" || role === "vendedora") {
       const name = getUserName();
       setSeller(name || "");
     } else {
       setSeller("");
     }
     setPayment("pix");
+    setCustomerName("");
     setDiscountType("none");
     setDiscountValue(0);
     setNote("");
@@ -275,7 +279,7 @@ export default function VendasPage() {
     if (!seller) {
       // se for seller e não tiver nome salvo, dá instrução clara
       const role = getRole();
-      if (role === "seller") {
+      if (role === "seller" || role === "vendedora") {
         setError(
           "Não foi possível identificar a vendedora logada. Saia e entre novamente."
         );
@@ -304,6 +308,7 @@ export default function VendasPage() {
       const payload: any = {
         items: itemsPayload,
         seller,
+        customer_name: customerName.trim() || null,
         payment,
         note: note.trim() ? note : null,
         discount_type: discountType,
@@ -332,6 +337,7 @@ export default function VendasPage() {
   }
 
   const role = useMemo(() => getRole(), []);
+  const isSeller = role === "seller" || role === "vendedora";
 
   return (
     <DashboardShell
@@ -430,6 +436,18 @@ export default function VendasPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md space-y-4">
             <h2 className="text-lg font-bold text-gray-900">Resumo</h2>
 
+            <div>
+              <label className="text-xs font-semibold text-gray-600">
+                Cliente <span className="font-normal text-gray-400">(opcional)</span>
+              </label>
+              <input
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Nome da cliente"
+                className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
+              />
+            </div>
+
             {/* Vendedora */}
             <div>
               <label className="text-xs font-semibold text-gray-600">
@@ -439,18 +457,18 @@ export default function VendasPage() {
               <select
                 value={seller}
                 onChange={(e) => setSeller(e.target.value)}
-                disabled={role === "seller"} // ✅ seller não escolhe
+                disabled={isSeller}
                 className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-60"
               >
                 <option value="">
-                  {role === "seller"
+                  {isSeller
                     ? "Vendedora logada"
                     : loadingSellers
                     ? "Carregando..."
                     : "Selecione..."}
                 </option>
 
-                {role !== "seller" &&
+                {!isSeller &&
                   sellers.map((s) => (
                     <option key={s.id} value={s.name}>
                       {s.name}
@@ -458,14 +476,14 @@ export default function VendasPage() {
                   ))}
               </select>
 
-              {role !== "seller" && !loadingSellers && sellers.length === 0 && (
+              {!isSeller && !loadingSellers && sellers.length === 0 && (
                 <p className="mt-2 text-xs text-gray-500">
                   Nenhuma vendedora ativa cadastrada. Cadastre em{" "}
                   <span className="font-semibold">/vendedoras</span>.
                 </p>
               )}
 
-              {role === "seller" && !seller && (
+              {isSeller && !seller && (
                 <p className="mt-2 text-xs text-red-600">
                   Não foi possível identificar seu nome. Saia e entre novamente.
                 </p>
@@ -583,23 +601,13 @@ export default function VendasPage() {
         >
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-semibold text-gray-600">
-                Produto
-              </label>
-              <select
-                value={selectedId}
-                onChange={(e) =>
-                  setSelectedId(e.target.value ? Number(e.target.value) : "")
-                }
-                className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
-              >
-                <option value="">Selecione…</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {formatBRL(p.price)} (Estoque: {p.stock})
-                  </option>
-                ))}
-              </select>
+              <ProductAutocomplete
+                products={products}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                label="Produto"
+                placeholder="Digite o código ou nome do produto"
+              />
             </div>
 
             <div>

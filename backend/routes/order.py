@@ -1,20 +1,81 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
 from db.database import get_db
 from models.order import Order
 from models.order_item import OrderItem
 from models.product import Product
-from schemas.order import OrderCreate, OrderResponse
+from schemas.order import OrderCreate, OrderResponse, SellerSalesResponse
+from models.user import User
+from core.auth_deps import get_current_user
+from core.permissions import require_roles
 
 router = APIRouter(tags=["Orders"])
 
 @router.get("/", response_model=list[OrderResponse])
-def list_orders(db: Session = Depends(get_db)):
+def list_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager")),
+):
     return db.query(Order).order_by(Order.id.desc()).all()
 
+
+@router.get("/mine", response_model=SellerSalesResponse)
+def list_my_orders(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("seller", "vendedora")),
+):
+    days = max(1, min(days, 365))
+    date_from = datetime.now() - timedelta(days=days - 1)
+
+    ownership = or_(
+        Order.created_by_user_id == current_user.id,
+        func.lower(func.coalesce(Order.seller, "")) == current_user.name.strip().lower(),
+    )
+
+    orders = (
+        db.query(Order)
+        .filter(ownership, Order.created_at >= date_from)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    sales = []
+    total_items = 0
+    for order in orders:
+        items = (
+            db.query(func.coalesce(func.sum(OrderItem.quantity), 0))
+            .filter(OrderItem.order_id == order.id)
+            .scalar()
+            or 0
+        )
+        total_items += int(items)
+        sales.append({
+            "id": order.id,
+            "total": float(order.total),
+            "customer_name": order.customer_name,
+            "payment": order.payment,
+            "items": int(items),
+            "created_at": order.created_at,
+        })
+
+    return {
+        "days": days,
+        "total": float(sum(order.total for order in orders)),
+        "orders": len(orders),
+        "items": total_items,
+        "sales": sales,
+    }
+
 @router.post("/", response_model=OrderResponse)
-def create_order(order: OrderCreate, db: Session = Depends(get_db)):
+def create_order(
+    order: OrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     # valida desconto
     discount_type = order.discount_type
     discount_value = float(order.discount_value or 0)
@@ -63,9 +124,14 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     if total < 0:
         total = 0.0
 
+    is_seller = current_user.role in ("seller", "vendedora")
+    seller_name = current_user.name if is_seller else (order.seller.strip() if order.seller else None)
+
     db_order = Order(
         total=total,
-        seller=(order.seller.strip() if order.seller else None),
+        seller=seller_name,
+        customer_name=(order.customer_name.strip() if order.customer_name else None),
+        created_by_user_id=current_user.id,
         payment=order.payment,
         discount_type=discount_type,
         discount_value=discount_value,

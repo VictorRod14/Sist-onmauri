@@ -12,6 +12,8 @@ class Order(Base):
 
     # novos campos
     seller = Column(String, nullable=True)
+    customer_name = Column(String, nullable=True)
+    created_by_user_id = Column(Integer, nullable=True)
     payment = Column(String, nullable=False, default="pix")  # pix/credito/debito/dinheiro
     discount_type = Column(String, nullable=False, default="none")  # none/money/percent
     discount_value = Column(Float, nullable=False, default=0.0)

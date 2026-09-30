@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { deleteProduct, getProducts, Product } from "../services/products";
+import { deleteProduct, getNextProductCode, getProducts, Product } from "../services/products";
 import Modal from "../components/modal";
 import { ConfirmModal } from "../components/confirmmodal";
 import { ProductForm } from "../components/productform";
@@ -28,6 +28,7 @@ function getRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
 
 export default function EstoquePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [nextProductCode, setNextProductCode] = useState("00001");
   const [role, setRole] = useState<"admin" | "gerente" | "seller" | "vendedora" | "">("");
 
   const [openCreate, setOpenCreate] = useState(false);
@@ -44,8 +45,9 @@ export default function EstoquePage() {
   const [sortBy, setSortBy] = useState<SortKey>("name");
 
   async function loadProducts() {
-    const data = await getProducts();
+    const [data, nextCode] = await Promise.all([getProducts(), getNextProductCode()]);
     setProducts(data);
+    setNextProductCode(nextCode);
   }
 
   useEffect(() => {
@@ -197,6 +199,7 @@ export default function EstoquePage() {
 
         <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="Cadastrar produto">
           <ProductForm
+            nextCode={nextProductCode}
             onCreated={() => {
               loadProducts();
               setOpenCreate(false);
@@ -214,6 +217,7 @@ export default function EstoquePage() {
         >
           <ProductForm
             initialProduct={editing}
+            nextCode={nextProductCode}
             onUpdated={() => {
               loadProducts();
               setOpenEdit(false);

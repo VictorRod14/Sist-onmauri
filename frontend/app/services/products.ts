@@ -40,3 +40,8 @@ export async function deleteProduct(id: number) {
   const response = await api.delete(`/products/${id}`);
   return response.data;
 }
+
+export async function getNextProductCode(): Promise<string> {
+  const response = await api.get("/products/next-code");
+  return response.data.next_code;
+}
