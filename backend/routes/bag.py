@@ -165,15 +165,12 @@ def return_bag(
     bag_id: int,
     payload: BagReturn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "gerente", "manager", "seller", "vendedora")),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager")),
 ):
     bag = db.query(Bag).filter(Bag.id == bag_id).first()
 
     if not bag:
         raise HTTPException(status_code=404, detail="Mala não encontrada")
-
-    if current_user.role in ("seller", "vendedora") and bag.created_by_user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Você só pode finalizar suas próprias malas")
 
     if bag.status != "open":
         raise HTTPException(status_code=400, detail="Essa mala já foi finalizada")

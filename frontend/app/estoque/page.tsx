@@ -64,7 +64,9 @@ export default function EstoquePage() {
     const totalItems = products.reduce((acc, p) => acc + (p.stock ?? 0), 0);
     const out = products.filter((p) => (p.stock ?? 0) === 0).length;
     const low = products.filter((p) => (p.stock ?? 0) > 0 && (p.stock ?? 0) < 5).length;
-    return { total, totalItems, out, low };
+    const costValue = products.reduce((acc, p) => acc + Number(p.cost_price ?? 0) * Number(p.stock ?? 0), 0);
+    const saleValue = products.reduce((acc, p) => acc + Number(p.price ?? 0) * Number(p.stock ?? 0), 0);
+    return { total, totalItems, out, low, costValue, saleValue, profitValue: saleValue - costValue };
   }, [products]);
 
   const subtitle = useMemo(() => {
@@ -135,8 +137,19 @@ export default function EstoquePage() {
         </button>
       }
     >
-      <main className="p-6 space-y-6">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md">
+      <main className="space-y-6">
+        {canViewFinancial && (
+          <div className="grid gap-4 md:grid-cols-3">
+            {[['Investimento em estoque', stats.costValue, 'Capital aplicado nas peças'], ['Potencial de venda', stats.saleValue, 'Valor total pelo preço de venda'], ['Lucro potencial', stats.profitValue, 'Projeção bruta do estoque']].map(([label,value,caption]) => (
+              <div key={String(label)} className="premium-card metric-card p-5">
+                <div className="text-[11px] font-bold uppercase tracking-[.14em] text-[#8b7554]">{String(label)}</div>
+                <div className="mt-3 text-2xl font-bold tracking-tight text-[#1b1814]">{Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
+                <div className="mt-2 text-xs text-gray-500">{String(caption)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="premium-card p-5">
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="lg:col-span-1">
               <label className="text-xs font-semibold text-gray-600">Buscar</label>
@@ -190,12 +203,6 @@ export default function EstoquePage() {
             </div>
           </div>
         </div>
-
-        {canViewFinancial && (
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-            Você está vendo informações financeiras sensíveis dos produtos.
-          </div>
-        )}
 
         <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="Cadastrar produto">
           <ProductForm

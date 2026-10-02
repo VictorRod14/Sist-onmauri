@@ -40,7 +40,11 @@ def create_product(
     product: ProductCreate,
     db: Session = Depends(get_db),
 ):
-    db_product = Product(**product.model_dump())
+    data = product.model_dump()
+    data["name"] = data["name"].strip().upper()
+    if data.get("description"):
+        data["description"] = data["description"].strip().upper()
+    db_product = Product(**data)
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
@@ -66,7 +70,11 @@ def update_product(
     if not db_product:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    for field, value in product.model_dump().items():
+    data = product.model_dump()
+    data["name"] = data["name"].strip().upper()
+    if data.get("description"):
+        data["description"] = data["description"].strip().upper()
+    for field, value in data.items():
         setattr(db_product, field, value)
 
     db.commit()

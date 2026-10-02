@@ -59,20 +59,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gray-100">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#151310] p-4">
+      <div className="absolute -left-28 top-[-10%] h-96 w-96 rounded-full bg-[#b8955b]/20 blur-3xl" />
+      <div className="absolute -bottom-40 right-[-8%] h-[520px] w-[520px] rounded-full bg-[#806945]/20 blur-3xl" />
       <form
         onSubmit={handleLogin}
-        className="bg-white p-8 rounded-xl shadow-lg w-[380px]"
+        className="relative w-full max-w-[410px] rounded-[30px] border border-white/70 bg-[#fffdf9] p-8 shadow-[0_35px_90px_rgba(0,0,0,.45),inset_0_1px_0_white] sm:p-10"
       >
-        <h1 className="text-2xl font-bold mb-6 text-center">
-          Sistema OnMauri
-        </h1>
+        <div className="mb-8 text-center"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#e1c99e] to-[#aa844b] font-serif text-lg font-bold text-[#211c15] shadow-lg">OM</div><h1 className="font-serif text-3xl font-bold tracking-tight text-[#1c1915]">OnMauri</h1><p className="mt-1 text-xs font-semibold tracking-[.18em] text-[#9b8057]">GESTÃO DE BOUTIQUE</p></div>
 
         {/* EMAIL */}
         <input
           type="email"
           placeholder="Email"
-          className="w-full border p-3 rounded mb-4"
+          className="mb-4 w-full rounded-xl border border-[#e4ddd3] bg-white p-3.5 shadow-sm outline-none focus:border-[#b8955b] focus:ring-4 focus:ring-[#b8955b]/10"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -82,7 +82,7 @@ export default function LoginPage() {
           <input
             type={showPassword ? "text" : "password"}
             placeholder="Senha"
-            className="w-full border p-3 rounded pr-12"
+            className="w-full rounded-xl border border-[#e4ddd3] bg-white p-3.5 pr-12 shadow-sm outline-none focus:border-[#b8955b] focus:ring-4 focus:ring-[#b8955b]/10"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -128,7 +128,7 @@ export default function LoginPage() {
 
         <button
           disabled={loading}
-          className="w-full bg-black text-white py-3 rounded hover:opacity-90 disabled:opacity-60"
+          className="w-full rounded-xl bg-gradient-to-r from-[#201d19] to-[#0e0d0b] py-3.5 font-semibold text-white shadow-[0_12px_25px_rgba(20,17,13,.25)] hover:-translate-y-0.5 disabled:opacity-60"
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>

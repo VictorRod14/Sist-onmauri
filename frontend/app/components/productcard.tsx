@@ -30,15 +30,8 @@ export function ProductCard({
       : "bg-green-100 text-green-700";
 
   return (
-    <div
-      className="
-        group bg-white rounded-2xl
-        border border-gray-200
-        shadow-md transition
-        hover:shadow-xl hover:-translate-y-1
-        p-5 flex flex-col gap-3
-      "
-    >
+    <div className="premium-card group flex flex-col gap-3 overflow-hidden p-5">
+      <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-[#c5a66f] to-transparent opacity-70" />
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-lg font-bold text-gray-900 leading-tight">
           {product.name}
@@ -81,7 +74,7 @@ export function ProductCard({
 
       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
         <span className="text-xl font-extrabold text-gray-900">
-          R$ {product.price.toFixed(2)}
+          {formatBRL(product.price)}
         </span>
 
         <div className="flex gap-2">

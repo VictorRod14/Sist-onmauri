@@ -32,7 +32,7 @@ export type SellerSales = {
   }>;
 };
 
-export async function getMySales(days = 30): Promise<SellerSales> {
-  const response = await api.get(`/orders/mine?days=${days}`);
+export async function getMySales(days = 30, dateFrom?: string, dateTo?: string): Promise<SellerSales> {
+  const response = await api.get("/orders/mine", { params: { days, date_from: dateFrom || undefined, date_to: dateTo || undefined } });
   return response.data;
 }

@@ -279,7 +279,7 @@ export default function MalasPage() {
         </button>
       }
     >
-      <main className="p-6 space-y-6">
+      <main className="space-y-6">
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 whitespace-pre-wrap">
             {error}
@@ -295,7 +295,7 @@ export default function MalasPage() {
             bags.map((bag) => (
               <div
                 key={bag.id}
-                className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md"
+                className="premium-card p-5"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -330,7 +330,7 @@ export default function MalasPage() {
                       {formatBRL(bag.total_sold_amount || 0)}
                     </div>
 
-                    {bag.status === "open" && (
+                    {bag.status === "open" && !isSeller && (
                       <button
                         onClick={() => openReturnModal(bag)}
                         className="mt-4 rounded-2xl bg-green-600 px-4 py-2 text-white font-medium hover:bg-green-700"
@@ -338,6 +338,7 @@ export default function MalasPage() {
                         Finalizar retorno
                       </button>
                     )}
+                    {bag.status === "open" && isSeller && <div className="mt-4 rounded-xl bg-[#f5efe4] px-3 py-2 text-xs font-semibold text-[#806942]">Aguardando finalização da gestão</div>}
                   </div>
                 </div>
 
@@ -345,7 +346,7 @@ export default function MalasPage() {
                   {bag.items.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-xl border border-gray-200 bg-gray-50 p-3"
+                      className="rounded-xl border border-[#e8e0d5] bg-[#fbf9f6] p-3 shadow-sm"
                     >
                       <div className="font-semibold text-gray-900">
                         {item.product_name || `Produto #${item.product_id}`}

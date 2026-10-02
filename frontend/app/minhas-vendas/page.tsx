@@ -20,7 +20,10 @@ const paymentLabels: Record<string, string> = {
 };
 
 export default function MinhasVendasPage() {
-  const [days, setDays] = useState(30);
+  const [period, setPeriod] = useState<"week" | "month" | "custom">("month");
+  const today = new Date().toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(today.slice(0, 8) + "01");
+  const [dateTo, setDateTo] = useState(today);
   const [data, setData] = useState<SellerSales | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,54 +31,59 @@ export default function MinhasVendasPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getMySales(days)
+    const now = new Date();
+    let from = dateFrom; let to = dateTo;
+    if (period === "week") {
+      const monday = new Date(now); const day = (now.getDay() + 6) % 7; monday.setDate(now.getDate() - day);
+      from = monday.toISOString().slice(0,10); to = today;
+    } else if (period === "month") { from = today.slice(0,8) + "01"; to = today; }
+    getMySales(30, from, to)
       .then(setData)
       .catch((err) => {
         const detail = err?.response?.data?.detail;
         setError(typeof detail === "string" ? detail : "Não foi possível carregar suas vendas.");
       })
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [period, dateFrom, dateTo, today]);
 
   return (
     <DashboardShell
       title="Minhas vendas"
       subtitle="Acompanhe somente as vendas vinculadas ao seu perfil"
       right={
-        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
-          <label className="mr-2 text-sm text-gray-500">Período</label>
-          <select value={days} onChange={(event) => setDays(Number(event.target.value))} className="bg-transparent font-semibold outline-none">
-            <option value={7}>7 dias</option>
-            <option value={15}>15 dias</option>
-            <option value={30}>30 dias</option>
-            <option value={60}>60 dias</option>
-            <option value={90}>90 dias</option>
+        <div className="rounded-2xl border border-[#e6ded2] bg-white px-4 py-2 shadow-sm">
+          <label className="mr-2 text-sm text-gray-500">Visualizar</label>
+          <select value={period} onChange={(event) => setPeriod(event.target.value as "week"|"month"|"custom")} className="bg-transparent font-semibold outline-none">
+            <option value="week">Esta semana</option>
+            <option value="month">Este mês</option>
+            <option value="custom">Período personalizado</option>
           </select>
         </div>
       }
     >
-      <main className="space-y-6 p-6">
+      <main className="space-y-6">
+        {period === "custom" && <div className="premium-card flex flex-col gap-4 p-4 sm:flex-row sm:items-end"><label className="flex-1 text-xs font-semibold text-gray-500">DATA INICIAL<input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="mt-2 block w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800"/></label><label className="flex-1 text-xs font-semibold text-gray-500">DATA FINAL<input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="mt-2 block w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800"/></label></div>}
         {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>}
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="premium-card metric-card p-5">
             <div className="text-sm font-medium text-gray-500">Total vendido</div>
             <div className="mt-2 text-3xl font-extrabold text-gray-900">{loading ? "…" : formatBRL(data?.total ?? 0)}</div>
-            <div className="mt-2 text-xs text-gray-400">Últimos {days} dias</div>
+            <div className="mt-2 text-xs text-gray-400">Período selecionado</div>
           </div>
-          <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="premium-card metric-card p-5">
             <div className="text-sm font-medium text-gray-500">Vendas realizadas</div>
             <div className="mt-2 text-3xl font-extrabold text-gray-900">{loading ? "…" : data?.orders ?? 0}</div>
             <div className="mt-2 text-xs text-gray-400">Pedidos concluídos</div>
           </div>
-          <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="premium-card metric-card p-5">
             <div className="text-sm font-medium text-gray-500">Peças vendidas</div>
             <div className="mt-2 text-3xl font-extrabold text-gray-900">{loading ? "…" : data?.items ?? 0}</div>
             <div className="mt-2 text-xs text-gray-400">Quantidade total de itens</div>
           </div>
         </div>
 
-        <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+        <section className="premium-card overflow-hidden">
           <div className="border-b border-gray-100 px-5 py-4">
             <h2 className="text-lg font-bold text-gray-900">Histórico de vendas</h2>
             <p className="text-sm text-gray-500">Cliente, pagamento, peças e valor de cada venda.</p>

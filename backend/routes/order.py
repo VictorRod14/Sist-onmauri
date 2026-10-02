@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_
@@ -25,23 +25,40 @@ def list_orders(
 @router.get("/mine", response_model=SellerSalesResponse)
 def list_my_orders(
     days: int = 30,
+    date_from: str | None = None,
+    date_to: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("seller", "vendedora")),
 ):
     days = max(1, min(days, 365))
-    date_from = datetime.now() - timedelta(days=days - 1)
+    start_at = datetime.now() - timedelta(days=days - 1)
+    end_at = None
+
+    if date_from:
+        try:
+            start_at = datetime.combine(datetime.strptime(date_from, "%Y-%m-%d").date(), time.min)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Data inicial inválida")
+    if date_to:
+        try:
+            end_at = datetime.combine(datetime.strptime(date_to, "%Y-%m-%d").date(), time.max)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Data final inválida")
+    if end_at and start_at > end_at:
+        raise HTTPException(status_code=400, detail="A data inicial deve ser anterior à data final")
 
     ownership = or_(
         Order.created_by_user_id == current_user.id,
         func.lower(func.coalesce(Order.seller, "")) == current_user.name.strip().lower(),
     )
 
-    orders = (
+    orders_query = (
         db.query(Order)
-        .filter(ownership, Order.created_at >= date_from)
-        .order_by(Order.created_at.desc())
-        .all()
+        .filter(ownership, Order.created_at >= start_at)
     )
+    if end_at:
+        orders_query = orders_query.filter(Order.created_at <= end_at)
+    orders = orders_query.order_by(Order.created_at.desc()).all()
 
     sales = []
     total_items = 0

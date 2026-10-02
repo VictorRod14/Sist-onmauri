@@ -58,6 +58,8 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  const [pricingMode, setPricingMode] = useState<"margin" | "manual">("margin");
+  const [marginPercent, setMarginPercent] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +86,10 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
           ? String(initialProduct.cost_price)
           : ""
       );
+      const cost = Number(initialProduct.cost_price ?? 0);
+      const sale = Number(initialProduct.price ?? 0);
+      setMarginPercent(cost > 0 ? String(Number((((sale - cost) / cost) * 100).toFixed(2))) : "");
+      setPricingMode("manual");
     } else {
       setCode(nextCode);
       setName("");
@@ -91,6 +97,8 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
       setPrice("");
       setStock("");
       setCostPrice("");
+      setMarginPercent("");
+      setPricingMode("margin");
     }
 
     setError(null);
@@ -104,6 +112,16 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
   const profitPreview = useMemo(() => {
     return priceNumber - costPriceNumber;
   }, [priceNumber, costPriceNumber]);
+
+  useEffect(() => {
+    if (pricingMode !== "margin") return;
+    const margin = normalizeMoneyForSubmit(marginPercent);
+    if (!costPrice.trim() || !marginPercent.trim()) {
+      setPrice("");
+      return;
+    }
+    setPrice((costPriceNumber * (1 + margin / 100)).toFixed(2));
+  }, [pricingMode, marginPercent, costPrice, costPriceNumber]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -121,8 +139,8 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
     if (costPriceNumber < 0) return setError("Custo não pode ser negativo.");
 
     const payload: ProductPayload = {
-      name: `${code.replace(/\D/g, "").padStart(5, "0")} ${name.trim()}`,
-      description: description.trim() || null,
+      name: `${code.replace(/\D/g, "").padStart(5, "0")} ${name.trim().toUpperCase()}`,
+      description: description.trim().toUpperCase() || null,
       price: priceNumber,
       stock: stockNumber,
       cost_price: costPriceNumber,
@@ -143,6 +161,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
         setPrice("");
         setStock("");
         setCostPrice("");
+        setMarginPercent("");
         onCreated?.();
       }
     } catch (err: any) {
@@ -161,7 +180,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl p-2 space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">
           {isEdit ? "Editar Produto" : "Novo Produto"}
@@ -199,7 +218,7 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
           <input
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(e.target.value.toUpperCase())}
             placeholder="Ex: Vestido Guipir Nude"
           />
         </div>
@@ -210,21 +229,21 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
         <input
           className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => setDescription(e.target.value.toUpperCase())}
           placeholder="Ex: Algodão premium"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="text-sm text-gray-600">Preço de venda</label>
+          <label className="text-sm text-gray-600">Custo</label>
           <input
             type="text"
             inputMode="decimal"
             className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
-            value={price}
-            onChange={(e) => setPrice(sanitizeMoneyInput(e.target.value))}
-            placeholder="Ex: 99,90"
+            value={costPrice}
+            onChange={(e) => setCostPrice(sanitizeMoneyInput(e.target.value))}
+            placeholder="Ex: 45,00"
           />
         </div>
 
@@ -241,16 +260,23 @@ export function ProductForm({ onCreated, onUpdated, initialProduct, nextCode = "
         </div>
       </div>
 
-      <div>
-        <label className="text-sm text-gray-600">Custo</label>
-        <input
-          type="text"
-          inputMode="decimal"
-          className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring"
-          value={costPrice}
-          onChange={(e) => setCostPrice(sanitizeMoneyInput(e.target.value))}
-          placeholder="Ex: 45,00"
-        />
+      <div className="rounded-2xl border border-[#e7dfd2] bg-[#fbf8f3] p-4 space-y-4">
+        <div className="flex gap-2 rounded-xl bg-white p-1 shadow-sm">
+          <button type="button" onClick={() => setPricingMode("margin")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${pricingMode === "margin" ? "bg-[#171512] text-white" : "text-gray-500"}`}>Calcular por margem</button>
+          <button type="button" onClick={() => setPricingMode("manual")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${pricingMode === "manual" ? "bg-[#171512] text-white" : "text-gray-500"}`}>Informar valor</button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {pricingMode === "margin" && (
+            <div>
+              <label className="text-sm text-gray-600">Margem sobre o custo (%)</label>
+              <input inputMode="decimal" className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring" value={marginPercent} onChange={(e) => setMarginPercent(sanitizeMoneyInput(e.target.value))} placeholder="Ex: 50" />
+            </div>
+          )}
+          <div className={pricingMode === "manual" ? "sm:col-span-2" : ""}>
+            <label className="text-sm text-gray-600">Preço de venda</label>
+            <input type="text" inputMode="decimal" readOnly={pricingMode === "margin"} className="mt-1 w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring read-only:bg-gray-100" value={price} onChange={(e) => setPrice(sanitizeMoneyInput(e.target.value))} placeholder="Ex: 99,90" />
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
