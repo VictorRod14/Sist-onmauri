@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../components/dashboardshell";
 import Modal from "../components/modal";
 import { getProducts, Product } from "../services/products";
-import { createBag, getBags, returnBag, Bag } from "../services/bag";
+import { createBag, updateBag, getBags, returnBag, Bag } from "../services/bag";
 import { ProductAutocomplete } from "../components/productautocomplete";
 
 type PaymentMethod = "pix" | "credito" | "debito" | "dinheiro";
@@ -43,6 +43,7 @@ export default function MalasPage() {
   const [role, setRole] = useState("");
 
   const [openCreate, setOpenCreate] = useState(false);
+  const [editingBag, setEditingBag] = useState<Bag | null>(null);
   const [openReturn, setOpenReturn] = useState(false);
 
   const [selectedBag, setSelectedBag] = useState<Bag | null>(null);
@@ -98,7 +99,20 @@ export default function MalasPage() {
 
   function openCreateModal() {
     setError(null);
+    setEditingBag(null);
     resetCreateForm();
+    setOpenCreate(true);
+  }
+
+  function openEditModal(bag: Bag) {
+    setError(null);
+    setEditingBag(bag);
+    setCustomerName(bag.customer_name);
+    setCustomerPhone(bag.customer_phone || "");
+    setNote(bag.note || "");
+    setSelectedProductId("");
+    setSelectedQty(1);
+    setDraftItems(bag.items.map((item) => ({ product_id: item.product_id, quantity: item.quantity_sent })));
     setOpenCreate(true);
   }
 
@@ -121,7 +135,8 @@ export default function MalasPage() {
       return;
     }
 
-    if (selectedQty > product.stock) {
+    const originalQuantity = editingBag?.items.find((item) => item.product_id === selectedProductId)?.quantity_sent ?? 0;
+    if (selectedQty > product.stock + originalQuantity) {
       setError(`Estoque insuficiente para ${product.name}.`);
       return;
     }
@@ -163,14 +178,17 @@ export default function MalasPage() {
 
     setSaving(true);
     try {
-      await createBag({
+      const payload = {
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim() || null,
         note: note.trim() || null,
         items: draftItems,
-      });
+      };
+      if (editingBag) await updateBag(editingBag.id, payload);
+      else await createBag(payload);
 
       setOpenCreate(false);
+      setEditingBag(null);
       resetCreateForm();
       await loadAll();
     } catch (err: any) {
@@ -330,14 +348,7 @@ export default function MalasPage() {
                       {formatBRL(bag.total_sold_amount || 0)}
                     </div>
 
-                    {bag.status === "open" && !isSeller && (
-                      <button
-                        onClick={() => openReturnModal(bag)}
-                        className="mt-4 rounded-2xl bg-green-600 px-4 py-2 text-white font-medium hover:bg-green-700"
-                      >
-                        Finalizar retorno
-                      </button>
-                    )}
+                    {bag.status === "open" && <div className="mt-4 flex flex-wrap justify-end gap-2"><button onClick={() => openEditModal(bag)} className="rounded-2xl border border-[#d9c9ad] bg-white px-4 py-2 font-semibold text-[#6e5938] shadow-sm hover:-translate-y-0.5">Editar mala</button>{!isSeller && <button onClick={() => openReturnModal(bag)} className="rounded-2xl bg-green-600 px-4 py-2 text-white font-medium hover:bg-green-700">Finalizar retorno</button>}</div>}
                     {bag.status === "open" && isSeller && <div className="mt-4 rounded-xl bg-[#f5efe4] px-3 py-2 text-xs font-semibold text-[#806942]">Aguardando finalização da gestão</div>}
                   </div>
                 </div>
@@ -371,7 +382,7 @@ export default function MalasPage() {
           )}
         </div>
 
-        <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="Nova mala">
+        <Modal open={openCreate} onClose={() => { setOpenCreate(false); setEditingBag(null); }} title={editingBag ? "Editar mala" : "Nova mala"}>
           <div className="space-y-4">
             <div>
               <label className="text-xs font-semibold text-gray-600">Cliente</label>
@@ -466,7 +477,7 @@ export default function MalasPage() {
 
             <div className="flex justify-end gap-3 pt-2">
               <button
-                onClick={() => setOpenCreate(false)}
+                onClick={() => { setOpenCreate(false); setEditingBag(null); }}
                 className="rounded-2xl border px-4 py-2"
               >
                 Cancelar
@@ -477,7 +488,7 @@ export default function MalasPage() {
                 disabled={saving}
                 className="rounded-2xl bg-black px-4 py-2 text-white disabled:opacity-50"
               >
-                {saving ? "Salvando..." : "Criar mala"}
+                {saving ? "Salvando..." : editingBag ? "Salvar alterações" : "Criar mala"}
               </button>
             </div>
           </div>

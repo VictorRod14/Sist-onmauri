@@ -66,3 +66,8 @@ export async function returnBag(id: number, payload: BagReturnPayload): Promise<
   const response = await api.post(`/bags/${id}/return`, payload);
   return response.data;
 }
+
+export async function updateBag(id: number, payload: BagCreatePayload): Promise<Bag> {
+  const response = await api.put(`/bags/${id}`, payload);
+  return response.data;
+}

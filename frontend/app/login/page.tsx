@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { login } from "../services/auth";
 
 export default function LoginPage() {
@@ -66,7 +67,7 @@ export default function LoginPage() {
         onSubmit={handleLogin}
         className="relative w-full max-w-[410px] rounded-[30px] border border-white/70 bg-[#fffdf9] p-8 shadow-[0_35px_90px_rgba(0,0,0,.45),inset_0_1px_0_white] sm:p-10"
       >
-        <div className="mb-8 text-center"><div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#e1c99e] to-[#aa844b] font-serif text-lg font-bold text-[#211c15] shadow-lg">OM</div><h1 className="font-serif text-3xl font-bold tracking-tight text-[#1c1915]">OnMauri</h1><p className="mt-1 text-xs font-semibold tracking-[.18em] text-[#9b8057]">SISTEMA ONMAURI</p></div>
+        <div className="mb-8 text-center"><div className="mx-auto mb-4 flex h-32 w-24 items-center justify-center rounded-[28px] bg-[#edf4c8] p-2 shadow-[0_16px_35px_rgba(49,45,35,.18),inset_0_1px_0_white]"><Image src="/onmauri-logo.png" alt="Logo OnMauri" width={78} height={116} className="h-full w-auto object-contain" priority /></div><h1 className="font-serif text-3xl font-bold tracking-tight text-[#1c1915]">OnMauri</h1><p className="mt-1 text-xs font-semibold tracking-[.18em] text-[#9b8057]">SISTEMA ONMAURI</p></div>
 
         {/* EMAIL */}
         <input

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { logout } from "../services/auth";
@@ -43,7 +44,7 @@ export function Sidebar() {
   const nav = useMemo(() => { const seller = role === "seller" || role === "vendedora"; return seller ? navAll.filter(i => ["/estoque", "/vendas", "/minhas-vendas", "/malas"].includes(i.href)) : navAll.filter(i => i.href !== "/minhas-vendas"); }, [role]);
   async function handleLogout() { await logout(); router.push("/login"); }
   return <aside className="premium-sidebar">
-    <div className="sidebar-brand"><div className="brand-mark">OM</div><div><div className="brand-name">OnMauri</div><div className="brand-caption">SISTEMA ONMAURI</div></div></div>
+    <div className="sidebar-brand"><div className="brand-mark"><Image src="/onmauri-logo.png" alt="Logo OnMauri" width={38} height={54} className="h-[48px] w-auto object-contain" priority /></div><div><div className="brand-name">OnMauri</div><div className="brand-caption">SISTEMA ONMAURI</div></div></div>
     <div className="sidebar-divider" />
     <nav className="sidebar-nav"><span className="sidebar-label">MENU PRINCIPAL</span>{nav.map(item => { const active = pathname === item.href || pathname.startsWith(item.href + "/"); return <Link key={item.href} href={item.href} className={`sidebar-link ${active ? "is-active" : ""}`}><span className="sidebar-icon"><Icon name={item.icon}/></span><span>{item.label}</span>{active && <span className="active-dot"/>}</Link>; })}</nav>
     <div className="sidebar-footer"><div className="sidebar-user"><div className="user-avatar">{name.slice(0,1).toUpperCase()}</div><div className="min-w-0"><div className="truncate text-sm font-semibold">{name}</div><div className="text-[11px] uppercase tracking-wider text-white/45">{role || "perfil"}</div></div></div><button type="button" onClick={handleLogout} className="logout-button"><Icon name="logout"/><span>Sair do sistema</span></button></div>

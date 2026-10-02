@@ -299,3 +299,57 @@ def return_bag(
     db.refresh(bag)
 
     return _build_bag_response(db, bag)
+
+
+@router.put("/{bag_id}", response_model=BagResponse)
+def update_bag(
+    bag_id: int,
+    payload: BagCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager", "seller", "vendedora")),
+):
+    bag = db.query(Bag).filter(Bag.id == bag_id).first()
+    if not bag:
+        raise HTTPException(status_code=404, detail="Mala não encontrada")
+    if bag.status != "open":
+        raise HTTPException(status_code=400, detail="Somente malas em aberto podem ser editadas")
+    if current_user.role in ("seller", "vendedora") and bag.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você só pode editar suas próprias malas")
+
+    customer_name = (payload.customer_name or "").strip()
+    if not customer_name:
+        raise HTTPException(status_code=400, detail="Nome do cliente é obrigatório")
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="A mala precisa ter pelo menos 1 produto")
+
+    current_items = db.query(BagItem).filter(BagItem.bag_id == bag.id).all()
+    for item in current_items:
+        product = db.query(Product).filter(Product.id == item.product_id).first()
+        if product:
+            product.stock += item.quantity_sent
+
+    normalized_items = []
+    seen_products = set()
+    for item in payload.items:
+        if item.product_id in seen_products:
+            raise HTTPException(status_code=400, detail="Produto repetido na mala")
+        seen_products.add(item.product_id)
+        product = db.query(Product).filter(Product.id == item.product_id, Product.active == True).first()
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Produto {item.product_id} não encontrado")
+        if product.stock < item.quantity:
+            raise HTTPException(status_code=400, detail=f"Estoque insuficiente para {product.name}")
+        product.stock -= item.quantity
+        normalized_items.append((product, int(item.quantity)))
+
+    for item in current_items:
+        db.delete(item)
+    bag.customer_name = customer_name
+    bag.customer_phone = payload.customer_phone.strip() if payload.customer_phone else None
+    bag.note = payload.note.strip() if payload.note else None
+    db.flush()
+    for product, quantity in normalized_items:
+        db.add(BagItem(bag_id=bag.id, product_id=product.id, quantity_sent=quantity, quantity_sold=0, quantity_returned=0, unit_price=float(product.price)))
+    db.commit()
+    db.refresh(bag)
+    return _build_bag_response(db, bag)

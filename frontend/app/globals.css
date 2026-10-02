@@ -21,7 +21,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .premium-sidebar { position: relative; z-index: 50; display: flex; width: 100%; flex-direction: column; color: #f8f4ed; background: linear-gradient(160deg,#201d19 0%,#12110f 58%,#090908 100%); padding: 18px; box-shadow: 16px 0 40px rgba(25,20,15,.10); }
 .sidebar-brand { display:flex; align-items:center; gap:12px; padding:8px 8px 14px; }
-.brand-mark { display:grid; place-items:center; width:42px; height:42px; border-radius:14px; color:#171512; font-family:Georgia,serif; font-weight:700; background:linear-gradient(145deg,#e8d1a9,#b8955b); box-shadow:0 10px 24px rgba(184,149,91,.25), inset 0 1px 1px #fff8; }
+.brand-mark { display:grid; place-items:center; width:48px; height:62px; flex:none; padding:5px; border-radius:17px; background:#edf4c8; box-shadow:0 10px 24px rgba(184,149,91,.22), inset 0 1px 1px #fff; }
 .brand-name { font-family:Georgia,serif; font-size:22px; letter-spacing:-.02em; }
 .brand-caption { margin-top:2px; font-size:9px; letter-spacing:.22em; color:#d9c59f; }
 .sidebar-divider { height:1px; margin:0 8px 18px; background:linear-gradient(90deg,transparent,#ffffff24,transparent); }
