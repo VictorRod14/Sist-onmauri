@@ -126,13 +126,13 @@ def update_seller(
 
 # ===============================
 # DESATIVAR VENDEDORA
-# SOMENTE ADMIN
+# admin + gerente
 # ===============================
 @router.delete("/{seller_id}")
 def delete_seller(
     seller_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("admin", "gerente")),
 ):
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
 

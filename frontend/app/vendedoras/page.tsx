@@ -141,10 +141,12 @@ export default function VendedorasPage() {
 
     try {
       await deleteSeller(deleteTarget.id);
-      cancelDelete();
+      setOpenDelete(false);
+      setDeleteTarget(null);
       await load();
-    } catch {
-      alert("Erro ao excluir.");
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      alert(detail || "Erro ao desativar vendedora.");
     } finally {
       setDeleting(false);
     }
@@ -230,7 +232,7 @@ export default function VendedorasPage() {
                       onClick={() => requestDelete(s)}
                       className="rounded-xl bg-black px-3 py-2 text-sm text-white hover:opacity-90"
                     >
-                      Excluir
+                      Desativar
                     </button>
                   </div>
                 </div>
@@ -294,9 +296,9 @@ export default function VendedorasPage() {
 
         <ConfirmModal
           open={openDelete}
-          title="Excluir vendedora"
+          title="Desativar vendedora"
           message={
-            deleteTarget ? `Deseja excluir "${deleteTarget.name}" do sistema?` : ""
+            deleteTarget ? `Deseja desativar "${deleteTarget.name}"? O histórico de vendas será preservado.` : ""
           }
           loading={deleting}
           onCancel={cancelDelete}

@@ -18,10 +18,10 @@ export async function createSeller(name: string, email: string) {
 }
 
 export async function updateSeller(id: number, payload: Partial<Seller>) {
-  const { data } = await api.put(`/sellers/${id}/`, payload);
+  const { data } = await api.put(`/sellers/${id}`, payload);
   return data;
 }
 
 export async function deleteSeller(id: number) {
-  await api.delete(`/sellers/${id}/`);
+  await api.delete(`/sellers/${id}`);
 }
