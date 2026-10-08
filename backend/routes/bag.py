@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from db.database import get_db
@@ -9,6 +10,7 @@ from models.bag_item import BagItem
 from models.order import Order
 from models.order_item import OrderItem
 from models.product import Product
+from models.seller import Seller
 from models.user import User
 from schemas.bag import BagCreate, BagReturn, BagResponse
 from core.permissions import require_roles
@@ -246,12 +248,32 @@ def return_bag(
             )
 
     if sold_order_items:
+        seller_input = (payload.seller or "").strip()
+        if not seller_input:
+            raise HTTPException(
+                status_code=400,
+                detail="Selecione a vendedora responsável pela venda",
+            )
+
+        registered_seller = (
+            db.query(Seller)
+            .filter(
+                func.lower(Seller.name) == seller_input.lower(),
+                Seller.active == True,
+            )
+            .first()
+        )
+        if not registered_seller:
+            raise HTTPException(
+                status_code=400,
+                detail="Vendedora inválida ou inativa",
+            )
+
         order_note = f"Venda gerada por retorno de mala #{bag.id}"
         if payload.note and payload.note.strip():
             order_note = f"{order_note} - {payload.note.strip()}"
 
-        is_seller = current_user.role in ("seller", "vendedora")
-        seller_name = current_user.name if is_seller else (payload.seller.strip() if payload.seller else None)
+        seller_name = registered_seller.name
 
         created_order = Order(
             total=total_sold_amount,

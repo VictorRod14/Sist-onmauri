@@ -9,7 +9,6 @@ from models.order_item import OrderItem
 from models.product import Product
 from schemas.order import OrderCreate, OrderResponse, SellerSalesResponse
 from models.user import User
-from core.auth_deps import get_current_user
 from core.permissions import require_roles
 
 router = APIRouter(tags=["Orders"])
@@ -91,7 +90,9 @@ def list_my_orders(
 def create_order(
     order: OrderCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_roles("admin", "gerente", "manager", "seller", "vendedora")
+    ),
 ):
     # valida desconto
     discount_type = order.discount_type

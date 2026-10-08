@@ -23,7 +23,7 @@ router = APIRouter(tags=["Sellers"])
 @router.get("/", response_model=list[SellerResponse])
 def list_sellers(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "gerente")),
+    current_user: User = Depends(require_roles("admin", "gerente", "manager")),
 ):
     return db.query(Seller).order_by(Seller.name.asc()).all()
 

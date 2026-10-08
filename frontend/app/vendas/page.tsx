@@ -31,7 +31,7 @@ function getRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
   const role = raw.trim().toLowerCase();
 
   if (role === "admin") return "admin";
-  if (role === "gerente") return "gerente";
+  if (role === "gerente" || role === "manager") return "gerente";
   if (role === "seller") return "seller";
   if (role === "vendedora") return "vendedora";
   return "";

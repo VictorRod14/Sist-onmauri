@@ -6,6 +6,7 @@ import Modal from "../components/modal";
 import { getProducts, Product } from "../services/products";
 import { createBag, updateBag, getBags, returnBag, Bag } from "../services/bag";
 import { ProductAutocomplete } from "../components/productautocomplete";
+import { getSellers, Seller } from "../services/sellers";
 
 type PaymentMethod = "pix" | "credito" | "debito" | "dinheiro";
 
@@ -40,7 +41,9 @@ function getRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
 export default function MalasPage() {
   const [bags, setBags] = useState<Bag[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [sellers, setSellers] = useState<Seller[]>([]);
   const [role, setRole] = useState("");
+  const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
 
   const [openCreate, setOpenCreate] = useState(false);
   const [editingBag, setEditingBag] = useState<Bag | null>(null);
@@ -69,6 +72,7 @@ export default function MalasPage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function loadAll() {
     const [bagsData, productsData] = await Promise.all([getBags(), getProducts()]);
@@ -77,8 +81,14 @@ export default function MalasPage() {
   }
 
   useEffect(() => {
-    setRole(getRole());
+    const currentRole = getRole();
+    setRole(currentRole);
     loadAll().catch(() => setError("Erro ao carregar dados."));
+    if (currentRole === "admin" || currentRole === "gerente") {
+      getSellers()
+        .then((data) => setSellers(data.filter((seller) => seller.active)))
+        .catch(() => setError("Erro ao carregar vendedoras."));
+    }
   }, []);
 
   const subtitle = useMemo(() => {
@@ -87,6 +97,16 @@ export default function MalasPage() {
     const returned = bags.filter((b) => b.status === "returned").length;
     return `${total} malas • ${open} em aberto • ${returned} finalizadas`;
   }, [bags]);
+
+  const activeBags = useMemo(
+    () => bags.filter((bag) => bag.status === "open"),
+    [bags]
+  );
+  const archivedBags = useMemo(
+    () => bags.filter((bag) => bag.status !== "open"),
+    [bags]
+  );
+  const visibleBags = activeTab === "active" ? activeBags : archivedBags;
 
   function resetCreateForm() {
     setCustomerName("");
@@ -99,6 +119,7 @@ export default function MalasPage() {
 
   function openCreateModal() {
     setError(null);
+    setNotice(null);
     setEditingBag(null);
     resetCreateForm();
     setOpenCreate(true);
@@ -106,6 +127,7 @@ export default function MalasPage() {
 
   function openEditModal(bag: Bag) {
     setError(null);
+    setNotice(null);
     setEditingBag(bag);
     setCustomerName(bag.customer_name);
     setCustomerPhone(bag.customer_phone || "");
@@ -201,11 +223,14 @@ export default function MalasPage() {
 
   function openReturnModal(bag: Bag) {
     setError(null);
+    setNotice(null);
     setSelectedBag(bag);
     setReturnPayment("pix");
     const currentRole = getRole();
     setReturnSeller(
-      currentRole === "seller" || currentRole === "vendedora" ? getUserName() : ""
+      currentRole === "seller" || currentRole === "vendedora"
+        ? getUserName()
+        : bag.seller || ""
     );
     setReturnNote("");
     setReturnItems(
@@ -260,11 +285,17 @@ export default function MalasPage() {
   async function handleReturnBag() {
     if (!selectedBag) return;
 
+    const hasSoldItems = returnItems.some((item) => item.quantity_sold > 0);
+    if (hasSoldItems && !returnSeller.trim()) {
+      setError("Selecione a vendedora responsável pela venda.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
     try {
-      await returnBag(selectedBag.id, {
+      const finalizedBag = await returnBag(selectedBag.id, {
         payment: returnPayment,
         seller: returnSeller.trim() || null,
         note: returnNote.trim() || null,
@@ -273,6 +304,12 @@ export default function MalasPage() {
 
       setOpenReturn(false);
       setSelectedBag(null);
+      setActiveTab("archived");
+      setNotice(
+        finalizedBag.order_id
+          ? "Mala finalizada, venda registrada e estoque atualizado com sucesso."
+          : "Mala finalizada e itens devolvidos ao estoque com sucesso."
+      );
       await loadAll();
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
@@ -304,13 +341,38 @@ export default function MalasPage() {
           </div>
         )}
 
+        {notice && (
+          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-green-800">
+            {notice}
+          </div>
+        )}
+
+        <div className="inline-flex rounded-2xl border border-[#dfe7d5] bg-white p-1.5 shadow-sm">
+          <button
+            type="button"
+            onClick={() => { setActiveTab("active"); setNotice(null); }}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === "active" ? "bg-[#29372d] text-white shadow-md" : "text-[#526153] hover:bg-[#eef3e9]"}`}
+          >
+            Malas ativas ({activeBags.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("archived"); setNotice(null); }}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${activeTab === "archived" ? "bg-[#29372d] text-white shadow-md" : "text-[#526153] hover:bg-[#eef3e9]"}`}
+          >
+            Malas arquivadas ({archivedBags.length})
+          </button>
+        </div>
+
         <div className="grid gap-4">
-          {bags.length === 0 ? (
+          {visibleBags.length === 0 ? (
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-md text-gray-600">
-              Nenhuma mala cadastrada ainda.
+              {activeTab === "active"
+                ? "Nenhuma mala em aberto."
+                : "Nenhuma mala arquivada ainda."}
             </div>
           ) : (
-            bags.map((bag) => (
+            visibleBags.map((bag) => (
               <div
                 key={bag.id}
                 className="premium-card p-5"
@@ -517,14 +579,24 @@ export default function MalasPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-600">Vendedora</label>
-                  <input
+                  <label className="text-xs font-semibold text-gray-600">
+                    Vendedora responsável
+                  </label>
+                  <select
                     value={returnSeller}
                     onChange={(e) => setReturnSeller(e.target.value)}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2"
-                    placeholder="Nome da vendedora"
-                    disabled={isSeller}
-                  />
+                  >
+                    <option value="">Selecione a vendedora...</option>
+                    {sellers.map((seller) => (
+                      <option key={seller.id} value={seller.name}>
+                        {seller.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Obrigatória quando houver produtos vendidos. A venda aparecerá em “Minhas vendas”.
+                  </p>
                 </div>
 
                 <div>
