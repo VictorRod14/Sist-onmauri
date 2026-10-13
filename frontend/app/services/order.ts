@@ -28,6 +28,14 @@ export type SellerSales = {
     customer_name?: string | null;
     payment: string;
     items: number;
+    products: Array<{
+      product_id: number;
+      code: string;
+      name: string;
+      quantity: number;
+      unit_price: number;
+      subtotal: number;
+    }>;
     created_at?: string | null;
   }>;
 };

@@ -34,12 +34,21 @@ class OrderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class SellerSaleProduct(BaseModel):
+    product_id: int
+    code: str
+    name: str
+    quantity: int
+    unit_price: float
+    subtotal: float
+
 class SellerSaleItem(BaseModel):
     id: int
     total: float
     customer_name: Optional[str] = None
     payment: str
     items: int
+    products: list[SellerSaleProduct]
     created_at: datetime | None = None
 
 class SellerSalesResponse(BaseModel):

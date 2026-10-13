@@ -15,11 +15,27 @@ type DraftBagItem = {
   quantity: number;
 };
 
+type ReturnBagItem = {
+  product_id: number;
+  quantity_sold: number;
+  quantity_returned: number;
+  confirmed: boolean;
+};
+
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
+}
+
+function splitProductLabel(value?: string | null, productId?: number) {
+  const label = (value || `Produto #${productId ?? ""}`).trim();
+  const match = label.match(/^(\d{1,5})\s+(.+)$/);
+  return {
+    code: match ? match[1].padStart(5, "0") : String(productId ?? "").padStart(5, "0"),
+    name: match ? match[2].trim() : label,
+  };
 }
 
 function getRole(): "admin" | "gerente" | "seller" | "vendedora" | "" {
@@ -62,13 +78,7 @@ export default function MalasPage() {
   const [returnPayment, setReturnPayment] = useState<PaymentMethod>("pix");
   const [returnSeller, setReturnSeller] = useState("");
   const [returnNote, setReturnNote] = useState("");
-  const [returnItems, setReturnItems] = useState<
-    Array<{
-      product_id: number;
-      quantity_sold: number;
-      quantity_returned: number;
-    }>
-  >([]);
+  const [returnItems, setReturnItems] = useState<ReturnBagItem[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +117,14 @@ export default function MalasPage() {
     [bags]
   );
   const visibleBags = activeTab === "active" ? activeBags : archivedBags;
+  const allReturnItemsConfirmed =
+    returnItems.length > 0 && returnItems.every((item) => item.confirmed);
+  const returnTotal = selectedBag
+    ? selectedBag.items.reduce((total, item) => {
+        const current = returnItems.find((entry) => entry.product_id === item.product_id);
+        return total + (current?.quantity_sold ?? 0) * item.unit_price;
+      }, 0)
+    : 0;
 
   function resetCreateForm() {
     setCustomerName("");
@@ -238,6 +256,7 @@ export default function MalasPage() {
         product_id: item.product_id,
         quantity_sold: 0,
         quantity_returned: item.quantity_sent,
+        confirmed: false,
       }))
     );
     setOpenReturn(true);
@@ -277,13 +296,30 @@ export default function MalasPage() {
           ...item,
           quantity_sold: nextSold,
           quantity_returned: nextReturned,
+          confirmed: false,
         };
       })
     );
   }
 
+  function toggleReturnItemConfirmation(productId: number) {
+    setError(null);
+    setReturnItems((prev) =>
+      prev.map((item) =>
+        item.product_id === productId
+          ? { ...item, confirmed: !item.confirmed }
+          : item
+      )
+    );
+  }
+
   async function handleReturnBag() {
     if (!selectedBag) return;
+
+    if (!allReturnItemsConfirmed) {
+      setError("Confira individualmente todos os produtos antes de finalizar a mala.");
+      return;
+    }
 
     const hasSoldItems = returnItems.some((item) => item.quantity_sold > 0);
     if (hasSoldItems && !returnSeller.trim()) {
@@ -299,7 +335,11 @@ export default function MalasPage() {
         payment: returnPayment,
         seller: returnSeller.trim() || null,
         note: returnNote.trim() || null,
-        items: returnItems,
+        items: returnItems.map(({ product_id, quantity_sold, quantity_returned }) => ({
+          product_id,
+          quantity_sold,
+          quantity_returned,
+        })),
       });
 
       setOpenReturn(false);
@@ -416,28 +456,31 @@ export default function MalasPage() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {bag.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-xl border border-[#e8e0d5] bg-[#fbf9f6] p-3 shadow-sm"
-                    >
-                      <div className="font-semibold text-gray-900">
-                        {item.product_name || `Produto #${item.product_id}`}
+                  {bag.items.map((item) => {
+                    const productLabel = splitProductLabel(item.product_name, item.product_id);
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-[#e8e0d5] bg-[#fbf9f6] p-3 shadow-sm"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="rounded-lg bg-[#e8efe2] px-2 py-1 text-xs font-bold text-[#526153]">
+                            {productLabel.code}
+                          </span>
+                          <div className="font-semibold text-gray-900">{productLabel.name}</div>
+                        </div>
+                        <div className="mt-2 text-sm text-gray-600">Enviado: {item.quantity_sent}</div>
+                        <div className="text-sm text-gray-600">Vendido: {item.quantity_sold}</div>
+                        <div className="text-sm text-gray-600">Devolvido: {item.quantity_returned}</div>
+                        <div className="mt-2 text-sm font-semibold text-gray-800">
+                          Valor unitário: {formatBRL(item.unit_price)}
+                        </div>
+                        <div className="text-sm font-bold text-emerald-700">
+                          Subtotal vendido: {formatBRL(item.quantity_sold * item.unit_price)}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Enviado: {item.quantity_sent}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Vendido: {item.quantity_sold}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Devolvido: {item.quantity_returned}
-                      </div>
-                      <div className="text-sm font-semibold text-gray-800 mt-2">
-                        Valor unitário: {formatBRL(item.unit_price)}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))
@@ -510,17 +553,22 @@ export default function MalasPage() {
                 ) : (
                   draftItems.map((item) => {
                     const product = products.find((p) => p.id === item.product_id);
+                    const productLabel = splitProductLabel(product?.name, item.product_id);
                     return (
                       <div
                         key={item.product_id}
                         className="flex items-center justify-between rounded-xl border border-gray-200 p-3"
                       >
-                        <div>
-                          <div className="font-semibold text-gray-900">
-                            {product?.name || `Produto #${item.product_id}`}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-lg bg-[#e8efe2] px-2 py-1 text-xs font-bold text-[#526153]">
+                              {productLabel.code}
+                            </span>
+                            <div className="truncate font-semibold text-gray-900">{productLabel.name}</div>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Quantidade: {item.quantity}
+                          <div className="mt-1 text-sm text-gray-500">Quantidade: {item.quantity}</div>
+                          <div className="text-sm font-semibold text-gray-700">
+                            {formatBRL(product?.price ?? 0)} cada • {formatBRL((product?.price ?? 0) * item.quantity)} no total
                           </div>
                         </div>
 
@@ -612,20 +660,38 @@ export default function MalasPage() {
                 <div className="space-y-3">
                   {selectedBag.items.map((item) => {
                     const current = returnItems.find((i) => i.product_id === item.product_id);
+                    const productLabel = splitProductLabel(item.product_name, item.product_id);
+                    const soldSubtotal = (current?.quantity_sold ?? 0) * item.unit_price;
 
                     return (
                       <div
                         key={item.product_id}
-                        className="rounded-xl border border-gray-200 p-4"
+                        className={`rounded-2xl border p-4 transition ${
+                          current?.confirmed
+                            ? "border-[#b9ccb0] bg-[#f4f8f1] shadow-sm"
+                            : "border-gray-200 bg-white"
+                        }`}
                       >
-                        <div className="font-semibold text-gray-900">
-                          {item.product_name}
-                        </div>
-                        <div className="text-sm text-gray-500 mb-3">
-                          Quantidade enviada: {item.quantity_sent}
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-start gap-2">
+                            <span className="rounded-lg bg-[#e8efe2] px-2 py-1 text-xs font-bold text-[#526153]">
+                              {productLabel.code}
+                            </span>
+                            <div>
+                              <div className="font-semibold text-gray-900">{productLabel.name}</div>
+                              <div className="text-sm text-gray-500">
+                                Enviada: {item.quantity_sent} • Unitário: {formatBRL(item.unit_price)}
+                              </div>
+                            </div>
+                          </div>
+                          {current?.confirmed && (
+                            <span className="rounded-full bg-[#dcebd5] px-3 py-1 text-xs font-bold text-[#39543d]">
+                              ✓ Conferido
+                            </span>
+                          )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="mt-4 grid grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs font-semibold text-gray-600">
                               Vendida
@@ -635,6 +701,7 @@ export default function MalasPage() {
                               min={0}
                               max={item.quantity_sent}
                               value={current?.quantity_sold ?? 0}
+                              disabled={current?.confirmed}
                               onChange={(e) =>
                                 updateReturnItem(
                                   item.product_id,
@@ -642,7 +709,7 @@ export default function MalasPage() {
                                   Number(e.target.value)
                                 )
                               }
-                              className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2"
+                              className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 disabled:bg-white/60 disabled:text-gray-500"
                             />
                           </div>
 
@@ -655,6 +722,7 @@ export default function MalasPage() {
                               min={0}
                               max={item.quantity_sent}
                               value={current?.quantity_returned ?? 0}
+                              disabled={current?.confirmed}
                               onChange={(e) =>
                                 updateReturnItem(
                                   item.product_id,
@@ -662,13 +730,54 @@ export default function MalasPage() {
                                   Number(e.target.value)
                                 )
                               }
-                              className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2"
+                              className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 disabled:bg-white/60 disabled:text-gray-500"
                             />
                           </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                              Subtotal comprado
+                            </div>
+                            <div className="text-lg font-extrabold text-emerald-700">
+                              {formatBRL(soldSubtotal)}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleReturnItemConfirmation(item.product_id)}
+                            className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                              current?.confirmed
+                                ? "border border-[#b9ccb0] bg-white text-[#526153] hover:bg-[#eef3e9]"
+                                : "bg-[#29372d] text-white shadow-sm hover:-translate-y-0.5"
+                            }`}
+                          >
+                            {current?.confirmed ? "Revisar produto" : "Conferir produto"}
+                          </button>
                         </div>
                       </div>
                     );
                   })}
+                </div>
+
+                <div className="rounded-2xl border border-[#dfe7d5] bg-[#f6f8f3] p-4">
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[#718071]">
+                        Conferência da mala
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-[#526153]">
+                        {returnItems.filter((item) => item.confirmed).length} de {returnItems.length} produtos conferidos
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[#718071]">
+                        Total efetivamente vendido
+                      </div>
+                      <div className="text-2xl font-extrabold text-emerald-700">{formatBRL(returnTotal)}</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
@@ -681,8 +790,9 @@ export default function MalasPage() {
 
                   <button
                     onClick={handleReturnBag}
-                    disabled={saving}
+                    disabled={saving || !allReturnItemsConfirmed}
                     className="rounded-2xl bg-green-600 px-4 py-2 text-white disabled:opacity-50"
+                    title={!allReturnItemsConfirmed ? "Confira todos os produtos antes de finalizar" : undefined}
                   >
                     {saving ? "Finalizando..." : "Finalizar retorno"}
                   </button>

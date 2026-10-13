@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, time
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_
@@ -62,12 +63,28 @@ def list_my_orders(
     sales = []
     total_items = 0
     for order in orders:
-        items = (
-            db.query(func.coalesce(func.sum(OrderItem.quantity), 0))
+        lines = (
+            db.query(OrderItem, Product)
+            .outerjoin(Product, Product.id == OrderItem.product_id)
             .filter(OrderItem.order_id == order.id)
-            .scalar()
-            or 0
+            .all()
         )
+        items = sum(int(line.quantity) for line, _ in lines)
+        products = []
+        for line, product in lines:
+            label = (product.name if product else f"Produto #{line.product_id}").strip()
+            match = re.match(r"^(\d{1,5})\s+(.+)$", label)
+            code = match.group(1).zfill(5) if match else str(line.product_id).zfill(5)
+            name = match.group(2).strip() if match else label
+            unit_price = float(line.price)
+            products.append({
+                "product_id": line.product_id,
+                "code": code,
+                "name": name,
+                "quantity": int(line.quantity),
+                "unit_price": unit_price,
+                "subtotal": unit_price * int(line.quantity),
+            })
         total_items += int(items)
         sales.append({
             "id": order.id,
@@ -75,6 +92,7 @@ def list_my_orders(
             "customer_name": order.customer_name,
             "payment": order.payment,
             "items": int(items),
+            "products": products,
             "created_at": order.created_at,
         })
 

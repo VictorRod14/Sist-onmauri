@@ -100,6 +100,17 @@ export default function MinhasVendasPage() {
                   <div>
                     <div className="font-semibold text-gray-900">Venda #{sale.id} • {sale.customer_name || "Cliente não informado"}</div>
                     <div className="mt-1 text-sm text-gray-500">{formatDate(sale.created_at)} • {paymentLabels[sale.payment] ?? sale.payment} • {sale.items} peça(s)</div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {sale.products.map((product, index) => (
+                        <span
+                          key={`${product.product_id}-${index}`}
+                          title={`${product.name} • ${formatBRL(product.unit_price)}`}
+                          className="rounded-lg border border-[#dfe7d5] bg-[#f6f8f3] px-2 py-1 text-xs font-semibold text-[#526153]"
+                        >
+                          Cód. {product.code} • {product.quantity} un.
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <div className="text-xl font-extrabold text-emerald-700">{formatBRL(sale.total)}</div>
                 </article>
