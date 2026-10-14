@@ -24,6 +24,8 @@ class BagItemReturn(BaseModel):
 class BagReturn(BaseModel):
     items: list[BagItemReturn]
     payment: Literal["pix", "credito", "debito", "dinheiro"] = "pix"
+    discount_type: Literal["none", "money", "percent"] = "none"
+    discount_value: float = Field(0.0, ge=0)
     seller: str | None = None
     note: str | None = None
 
@@ -50,6 +52,10 @@ class BagResponse(BaseModel):
     note: str | None = None
     payment: str | None = None
     seller: str | None = None
+    discount_type: str = "none"
+    discount_value: float = 0.0
+    subtotal_sold_amount: float = 0.0
+    discount_amount: float = 0.0
     total_sold_amount: float
     order_id: int | None = None
     date_out: datetime | None = None

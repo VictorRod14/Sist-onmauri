@@ -19,6 +19,10 @@ export interface Bag {
   note?: string | null;
   payment?: string | null;
   seller?: string | null;
+  discount_type: "none" | "money" | "percent";
+  discount_value: number;
+  subtotal_sold_amount: number;
+  discount_amount: number;
   total_sold_amount: number;
   order_id?: number | null;
   date_out?: string | null;
@@ -38,6 +42,8 @@ export type BagCreatePayload = {
 
 export type BagReturnPayload = {
   payment: "pix" | "credito" | "debito" | "dinheiro";
+  discount_type: "none" | "money" | "percent";
+  discount_value: number;
   seller?: string | null;
   note?: string | null;
   items: Array<{

@@ -9,6 +9,7 @@ import { ProductAutocomplete } from "../components/productautocomplete";
 import { getSellers, Seller } from "../services/sellers";
 
 type PaymentMethod = "pix" | "credito" | "debito" | "dinheiro";
+type DiscountType = "none" | "money" | "percent";
 
 type DraftBagItem = {
   product_id: number;
@@ -76,6 +77,8 @@ export default function MalasPage() {
   const [draftItems, setDraftItems] = useState<DraftBagItem[]>([]);
 
   const [returnPayment, setReturnPayment] = useState<PaymentMethod>("pix");
+  const [returnDiscountType, setReturnDiscountType] = useState<DiscountType>("none");
+  const [returnDiscountValue, setReturnDiscountValue] = useState(0);
   const [returnSeller, setReturnSeller] = useState("");
   const [returnNote, setReturnNote] = useState("");
   const [returnItems, setReturnItems] = useState<ReturnBagItem[]>([]);
@@ -119,12 +122,21 @@ export default function MalasPage() {
   const visibleBags = activeTab === "active" ? activeBags : archivedBags;
   const allReturnItemsConfirmed =
     returnItems.length > 0 && returnItems.every((item) => item.confirmed);
-  const returnTotal = selectedBag
+  const returnSubtotal = selectedBag
     ? selectedBag.items.reduce((total, item) => {
         const current = returnItems.find((entry) => entry.product_id === item.product_id);
         return total + (current?.quantity_sold ?? 0) * item.unit_price;
       }, 0)
     : 0;
+  const returnDiscountAmount = useMemo(() => {
+    if (returnDiscountType === "none" || returnDiscountValue <= 0) return 0;
+    if (returnDiscountType === "money") {
+      return Math.min(returnDiscountValue, returnSubtotal);
+    }
+    const percent = Math.min(Math.max(returnDiscountValue, 0), 100);
+    return (percent / 100) * returnSubtotal;
+  }, [returnDiscountType, returnDiscountValue, returnSubtotal]);
+  const returnTotal = Math.max(0, returnSubtotal - returnDiscountAmount);
 
   function resetCreateForm() {
     setCustomerName("");
@@ -244,6 +256,8 @@ export default function MalasPage() {
     setNotice(null);
     setSelectedBag(bag);
     setReturnPayment("pix");
+    setReturnDiscountType("none");
+    setReturnDiscountValue(0);
     const currentRole = getRole();
     setReturnSeller(
       currentRole === "seller" || currentRole === "vendedora"
@@ -333,6 +347,8 @@ export default function MalasPage() {
     try {
       const finalizedBag = await returnBag(selectedBag.id, {
         payment: returnPayment,
+        discount_type: returnDiscountType,
+        discount_value: returnDiscountType === "none" ? 0 : returnDiscountValue,
         seller: returnSeller.trim() || null,
         note: returnNote.trim() || null,
         items: returnItems.map(({ product_id, quantity_sold, quantity_returned }) => ({
@@ -449,6 +465,11 @@ export default function MalasPage() {
                     <div className="text-xl font-extrabold text-gray-900">
                       {formatBRL(bag.total_sold_amount || 0)}
                     </div>
+                    {bag.status !== "open" && (bag.discount_amount || 0) > 0 && (
+                      <div className="mt-1 text-xs font-semibold text-[#718071]">
+                        Subtotal {formatBRL(bag.subtotal_sold_amount || 0)} • Desconto {formatBRL(bag.discount_amount || 0)}
+                      </div>
+                    )}
 
                     {bag.status === "open" && <div className="mt-4 flex flex-wrap justify-end gap-2"><button onClick={() => openEditModal(bag)} className="rounded-2xl border border-[#d9c9ad] bg-white px-4 py-2 font-semibold text-[#6e5938] shadow-sm hover:-translate-y-0.5">Editar mala</button>{!isSeller && <button onClick={() => openReturnModal(bag)} className="rounded-2xl bg-green-600 px-4 py-2 text-white font-medium hover:bg-green-700">Finalizar retorno</button>}</div>}
                     {bag.status === "open" && isSeller && <div className="mt-4 rounded-xl bg-[#f5efe4] px-3 py-2 text-xs font-semibold text-[#806942]">Aguardando finalização da gestão</div>}
@@ -626,6 +647,39 @@ export default function MalasPage() {
                   </select>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600">Desconto</label>
+                    <select
+                      value={returnDiscountType}
+                      onChange={(e) => {
+                        const value = e.target.value as DiscountType;
+                        setReturnDiscountType(value);
+                        if (value === "none") setReturnDiscountValue(0);
+                      }}
+                      className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-black/10"
+                    >
+                      <option value="none">Sem</option>
+                      <option value="money">R$</option>
+                      <option value="percent">%</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600">Valor</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={returnDiscountType === "percent" ? 100 : undefined}
+                      step="0.01"
+                      value={returnDiscountValue}
+                      onChange={(e) => setReturnDiscountValue(Number(e.target.value))}
+                      disabled={returnDiscountType === "none"}
+                      className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-xs font-semibold text-gray-600">
                     Vendedora responsável
@@ -762,7 +816,7 @@ export default function MalasPage() {
                 </div>
 
                 <div className="rounded-2xl border border-[#dfe7d5] bg-[#f6f8f3] p-4">
-                  <div className="flex items-end justify-between gap-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                       <div className="text-xs font-semibold uppercase tracking-wide text-[#718071]">
                         Conferência da mala
@@ -771,11 +825,21 @@ export default function MalasPage() {
                         {returnItems.filter((item) => item.confirmed).length} de {returnItems.length} produtos conferidos
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-[#718071]">
-                        Total efetivamente vendido
+                    <div className="w-full space-y-1.5 text-sm sm:w-64">
+                      <div className="flex justify-between text-[#718071]">
+                        <span>Subtotal</span>
+                        <span className="font-semibold text-[#526153]">{formatBRL(returnSubtotal)}</span>
                       </div>
-                      <div className="text-2xl font-extrabold text-emerald-700">{formatBRL(returnTotal)}</div>
+                      <div className="flex justify-between text-[#718071]">
+                        <span>Desconto</span>
+                        <span className="font-semibold text-[#526153]">- {formatBRL(returnDiscountAmount)}</span>
+                      </div>
+                      <div className="flex items-end justify-between border-t border-[#dfe7d5] pt-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-[#718071]">
+                          Total final
+                        </span>
+                        <span className="text-2xl font-extrabold text-emerald-700">{formatBRL(returnTotal)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -20,6 +20,7 @@ router = APIRouter(tags=["Bags"])
 
 def _build_bag_response(db: Session, bag: Bag) -> dict:
     bag_items = db.query(BagItem).filter(BagItem.bag_id == bag.id).all()
+    created_order = db.query(Order).filter(Order.id == bag.order_id).first() if bag.order_id else None
 
     items_response = []
 
@@ -38,6 +39,11 @@ def _build_bag_response(db: Session, bag: Bag) -> dict:
             }
         )
 
+    subtotal_sold_amount = sum(
+        float(item.unit_price) * int(item.quantity_sold or 0) for item in bag_items
+    )
+    total_sold_amount = float(bag.total_sold_amount or 0.0)
+
     return {
         "id": bag.id,
         "created_by_user_id": bag.created_by_user_id,
@@ -47,7 +53,11 @@ def _build_bag_response(db: Session, bag: Bag) -> dict:
         "note": bag.note,
         "payment": bag.payment,
         "seller": bag.seller,
-        "total_sold_amount": float(bag.total_sold_amount or 0.0),
+        "discount_type": created_order.discount_type if created_order else "none",
+        "discount_value": float(created_order.discount_value or 0.0) if created_order else 0.0,
+        "subtotal_sold_amount": subtotal_sold_amount,
+        "discount_amount": max(0.0, subtotal_sold_amount - total_sold_amount),
+        "total_sold_amount": total_sold_amount,
         "order_id": bag.order_id,
         "date_out": bag.date_out,
         "returned_at": bag.returned_at,
@@ -195,7 +205,7 @@ def return_bag(
         payload_map[item.product_id] = item
 
     sold_order_items = []
-    total_sold_amount = 0.0
+    subtotal_sold_amount = 0.0
 
     for db_item in db_items:
         product = db.query(Product).filter(Product.id == db_item.product_id).first()
@@ -237,7 +247,7 @@ def return_bag(
 
         if quantity_sold > 0:
             line_total = float(db_item.unit_price) * quantity_sold
-            total_sold_amount += line_total
+            subtotal_sold_amount += line_total
 
             sold_order_items.append(
                 {
@@ -248,6 +258,23 @@ def return_bag(
             )
 
     if sold_order_items:
+        discount_type = payload.discount_type
+        discount_value = float(payload.discount_value or 0.0)
+        if discount_type == "percent" and discount_value > 100:
+            raise HTTPException(
+                status_code=400,
+                detail="Desconto percentual máximo é 100",
+            )
+
+        if discount_type == "money":
+            discount_amount = min(discount_value, subtotal_sold_amount)
+        elif discount_type == "percent":
+            discount_amount = (discount_value / 100.0) * subtotal_sold_amount
+        else:
+            discount_value = 0.0
+            discount_amount = 0.0
+
+        total_sold_amount = max(0.0, subtotal_sold_amount - discount_amount)
         seller_input = (payload.seller or "").strip()
         if not seller_input:
             raise HTTPException(
@@ -281,8 +308,8 @@ def return_bag(
             customer_name=bag.customer_name,
             created_by_user_id=current_user.id,
             payment=payload.payment,
-            discount_type="none",
-            discount_value=0.0,
+            discount_type=discount_type,
+            discount_value=discount_value,
             note=order_note,
         )
 
@@ -303,6 +330,7 @@ def return_bag(
         bag.payment = payload.payment
         bag.seller = seller_name
     else:
+        total_sold_amount = 0.0
         bag.order_id = None
         bag.payment = None
         bag.seller = current_user.name if current_user.role in ("seller", "vendedora") else (payload.seller.strip() if payload.seller else None)
